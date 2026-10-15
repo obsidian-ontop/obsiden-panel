@@ -39,6 +39,12 @@ export class NestsController {
     return this.nestsService.createNest(dto);
   }
 
+  @Post('seed-minecraft')
+  @ApiOperation({ summary: 'Seed default Minecraft Java nest and eggs (Paper, Fabric, Forge, Vanilla, Purpur, Velocity)' })
+  async seedMinecraft() {
+    return this.nestsService.seedDefaultMinecraftNests();
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update nest' })
   async updateNest(

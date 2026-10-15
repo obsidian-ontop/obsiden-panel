@@ -54,8 +54,8 @@ export class ServerAccessGuard implements CanActivate {
       throw new NotFoundException(`Server with UUID ${serverUuid} not found`);
     }
 
-    // Attach server to request for controller handlers
-    request.server = server;
+    // Attach server to request for controller handlers (avoid overwriting Fastify request.server)
+    request.gameServer = server;
 
     // Admin has superuser access
     if (user.isAdmin) {

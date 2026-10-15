@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchApi } from '../../../../../lib/api';
 import {
@@ -43,8 +43,9 @@ export default function ServerFilesPage({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // List files query
   const { data: files, isLoading, refetch } = useQuery<WingsFile[]>({
@@ -82,6 +83,49 @@ export default function ServerFilesPage({
     },
   });
 
+  const uploadFiles = async (fileList: FileList | File[]) => {
+    if (!fileList || fileList.length === 0) return;
+    setUploading(true);
+    try {
+      for (let i = 0; i < fileList.length; i++) {
+        const f = fileList[i];
+        if (!f) continue;
+        const targetPath = currentDirectory === '/' ? `/${f.name}` : `${currentDirectory}/${f.name}`;
+        const content = await f.text();
+        await fetchApi(`/api/client/servers/${uuid}/files/write?file=${encodeURIComponent(targetPath)}`, {
+          method: 'POST',
+          body: JSON.stringify({ content }),
+        });
+      }
+      refetch();
+    } catch (err: any) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await uploadFiles(e.dataTransfer.files);
+    }
+  };
+
   const handleOpenFile = async (file: WingsFile) => {
     if (file.directory) {
       const nextDir = currentDirectory === '/' ? `/${file.name}` : `${currentDirectory}/${file.name}`;
@@ -113,7 +157,39 @@ export default function ServerFilesPage({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4 relative min-h-[500px]"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input
+        type="file"
+        multiple
+        ref={fileInputRef}
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) uploadFiles(e.target.files);
+        }}
+      />
+
+      {/* Drag & Drop Visual Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-primary/10 border-2 border-dashed border-primary rounded-card backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none animate-in fade-in">
+          <Upload className="w-10 h-10 text-primary animate-bounce mb-2" />
+          <p className="text-sm font-bold text-text-primary">Drop files here to upload</p>
+          <p className="text-xs text-text-muted mt-0.5">Uploading directly to {currentDirectory}</p>
+        </div>
+      )}
+
+      {/* Uploading Banner */}
+      {uploading && (
+        <div className="p-3 rounded-control bg-primary/10 border border-primary/20 text-xs text-primary flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Uploading file(s) to server directory...
+        </div>
+      )}
+
       {/* File Editor Modal */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -187,6 +263,15 @@ export default function ServerFilesPage({
           <Button
             variant="secondary"
             size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload Files"
+          >
+            <Upload className="w-3.5 h-3.5" /> Upload
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => refetch()}
             title="Refresh Directory"
           >
@@ -217,7 +302,7 @@ export default function ServerFilesPage({
           <div className="p-8 text-center text-xs text-text-muted">Loading directory contents...</div>
         ) : (files || []).length === 0 ? (
           <div className="p-12 text-center text-xs text-text-muted">
-            This directory is empty
+            This directory is empty. Drop files here or use the Upload button to add files.
           </div>
         ) : (
           <table className="w-full text-left text-xs">

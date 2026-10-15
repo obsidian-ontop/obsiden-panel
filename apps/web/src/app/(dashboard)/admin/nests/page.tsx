@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchApi } from '../../../../lib/api';
-import { Layers, Plus, Upload, Download, Trash2, Box, FileText } from 'lucide-react';
+import { Layers, Plus, Upload, Download, Trash2, Box, FileText, Sparkles } from 'lucide-react';
 import { Button } from '../../../../components/ui/button';
 import { Card } from '../../../../components/ui/card';
 import { Badge } from '../../../../components/ui/badge';
@@ -27,6 +27,21 @@ export default function AdminNestsPage() {
   const { data: eggs } = useQuery<any[]>({
     queryKey: ['admin-eggs'],
     queryFn: () => fetchApi('/api/admin/eggs'),
+  });
+
+  const seedMinecraftMutation = useMutation({
+    mutationFn: () =>
+      fetchApi('/api/admin/nests/seed-minecraft', {
+        method: 'POST',
+      }),
+    onSuccess: (data: any) => {
+      alert(`Successfully seeded Minecraft Java nest and eggs (Paper, Fabric, Forge, Purpur, Vanilla, Velocity)!`);
+      queryClient.invalidateQueries({ queryKey: ['admin-nests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-eggs'] });
+    },
+    onError: (err: any) => {
+      alert(`Seeding failed: ${err.message}`);
+    },
   });
 
   const createNestMutation = useMutation({
@@ -97,6 +112,18 @@ export default function AdminNestsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="md"
+            disabled={seedMinecraftMutation.isPending}
+            onClick={() => {
+              if (confirm('Auto-seed Minecraft Java nest with Paper, Fabric, Forge, Purpur, Vanilla, and Velocity eggs?')) {
+                seedMinecraftMutation.mutate();
+              }
+            }}
+          >
+            <Sparkles className="w-4 h-4 text-primary" /> {seedMinecraftMutation.isPending ? 'Seeding Eggs...' : 'Auto-Seed Minecraft Eggs'}
+          </Button>
           <Button variant="secondary" size="md" onClick={() => setShowNestModal(true)}>
             <Plus className="w-4 h-4" /> New Nest
           </Button>

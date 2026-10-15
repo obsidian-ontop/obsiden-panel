@@ -116,7 +116,7 @@ export class WingsRemoteService {
         },
         mappings,
       },
-      mounts: server.mounts.map(sm => ({
+      mounts: (server.mounts || []).map(sm => ({
         source: sm.mount.source,
         target: sm.mount.target,
         read_only: sm.mount.readOnly,
