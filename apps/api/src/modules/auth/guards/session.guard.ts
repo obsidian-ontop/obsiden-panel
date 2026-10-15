@@ -18,7 +18,11 @@ export class SessionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
 
     // Try session cookie first
-    const sessionToken = request.cookies?.session;
+    let sessionToken = request.cookies?.session;
+    if (!sessionToken && request.headers.cookie) {
+      const match = request.headers.cookie.match(/(?:^|;\s*)session=([^;]+)/);
+      if (match) sessionToken = decodeURIComponent(match[1]);
+    }
     if (sessionToken) {
       const user = await this.authService.validateSession(sessionToken);
       if (user) {

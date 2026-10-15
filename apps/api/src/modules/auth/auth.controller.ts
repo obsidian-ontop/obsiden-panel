@@ -87,13 +87,22 @@ export class AuthController {
       (process.env.APP_URL?.startsWith('https://') ?? false);
 
     // Set HttpOnly cookie (SSL or non-SSL safe)
-    res.setCookie('session', token, {
-      httpOnly: true,
-      secure: isHttps,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-    });
+    if (typeof res.setCookie === 'function') {
+      res.setCookie('session', token, {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+      });
+    } else {
+      const cookieHeader = `session=${token}; Path=/; Max-Age=${7 * 24 * 60 * 60}; HttpOnly; SameSite=Lax${isHttps ? '; Secure' : ''}`;
+      if (res.raw?.setHeader) {
+        res.raw.setHeader('Set-Cookie', cookieHeader);
+      } else if (res.header) {
+        res.header('Set-Cookie', cookieHeader);
+      }
+    }
 
     // Log successful login
     await this.prisma.auditLog.create({
@@ -139,7 +148,16 @@ export class AuthController {
       }).catch(() => {});
     }
 
-    res.clearCookie('session', { path: '/' });
+    if (typeof res.clearCookie === 'function') {
+      res.clearCookie('session', { path: '/' });
+    } else {
+      const cookieHeader = `session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+      if (res.raw?.setHeader) {
+        res.raw.setHeader('Set-Cookie', cookieHeader);
+      } else if (res.header) {
+        res.header('Set-Cookie', cookieHeader);
+      }
+    }
   }
 
   /**
@@ -248,8 +266,9 @@ export class AuthController {
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset account password' })
   async resetPassword(
-    @Body() body: { email: string; token: string; password: string },
+    @Body() body: { email?: string; token: string; password?: string; newPassword?: string },
   ) {
-    return this.authService.resetPassword(body.email, body.token, body.password);
+    const password = body.password || body.newPassword || '';
+    return this.authService.resetPassword(body.email || body.token, body.token, password);
   }
 }

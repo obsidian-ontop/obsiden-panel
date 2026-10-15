@@ -476,7 +476,7 @@ NEXT_PUBLIC_APP_URL=$APP_URL
 EOF
 
     echo -e "${GREEN}[*] Installing monorepo packages via pnpm...${NC}"
-    pnpm install
+    NODE_ENV=development pnpm install --prod=false
 
     echo -e "${GREEN}[*] Building contracts, permissions, and wings adapter...${NC}"
     pnpm --filter @obsidian/contracts build
@@ -494,6 +494,7 @@ EOF
     cd "$INSTALL_DIR"
 
     echo -e "${GREEN}[*] Building Next.js Web Frontend & NestJS Backend...${NC}"
+    rm -f "$INSTALL_DIR/apps/api/tsconfig.tsbuildinfo" "$INSTALL_DIR/tsconfig.tsbuildinfo" 2>/dev/null || true
     pnpm --filter @obsidian/api build
     pnpm --filter @obsidian/web build
 
@@ -548,7 +549,7 @@ EOF
 Description=Obsidian Panel Web Frontend (Next.js)
 Documentation=https://github.com/obsidian-ontop/obsiden-panel
 After=network.target obsidian-api.service
-Requires=obsidian-api.service
+Wants=obsidian-api.service
 
 [Service]
 Type=simple
@@ -557,8 +558,7 @@ Group=www-data
 WorkingDirectory=/var/www/obsidian/apps/web
 Environment=NODE_ENV=production
 Environment=PORT=3000
-Environment=API_URL=http://127.0.0.1:3001
-ExecStart=$NODE_BIN $NEXT_BIN start -p 3000
+ExecStart=/var/www/obsidian/apps/web/node_modules/.bin/next start -p 3000
 
 Restart=always
 RestartSec=3s

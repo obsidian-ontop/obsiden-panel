@@ -360,13 +360,31 @@ export class AuthService {
   /**
    * Reset a user password using a valid reset token.
    */
-  async resetPassword(email: string, token: string, newPassword: string): Promise<{ message: string }> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (newPassword.length < 8) {
+  async resetPassword(emailOrToken: string, tokenOrPassword: string, newPassword?: string): Promise<{ message: string }> {
+    let email = emailOrToken;
+    let token = tokenOrPassword;
+    let password = newPassword;
+
+    // Handle 2-argument invocation: resetPassword(token, password)
+    if (!newPassword) {
+      token = emailOrToken;
+      password = tokenOrPassword;
+      const tHash = createHash('sha256').update((token || '').trim()).digest('hex');
+      const rec = await this.prisma.passwordReset.findFirst({
+        where: { tokenHash: tHash, expiresAt: { gt: new Date() } },
+      });
+      if (!rec) {
+        throw new BadRequestException('Invalid or expired password reset link.');
+      }
+      email = rec.email;
+    }
+
+    if (!password || password.length < 8) {
       throw new BadRequestException('Password must be at least 8 characters long.');
     }
 
-    const tokenHash = createHash('sha256').update(token.trim()).digest('hex');
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const tokenHash = createHash('sha256').update((token || '').trim()).digest('hex');
 
     const record = await this.prisma.passwordReset.findFirst({
       where: {
@@ -388,7 +406,7 @@ export class AuthService {
       throw new NotFoundException('User account not found.');
     }
 
-    const passwordHash = await this.hashPassword(newPassword);
+    const passwordHash = await this.hashPassword(password);
 
     await this.prisma.user.update({
       where: { id: user.id },

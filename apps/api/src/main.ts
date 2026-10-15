@@ -36,6 +36,11 @@ async function bootstrap() {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   });
 
+  // Fastify Cookie plugin
+  await app.register(import('@fastify/cookie') as any, {
+    secret: process.env.SESSION_SECRET ?? 'obsidian-panel-session-secret-key-32',
+  });
+
   // CORS — tight by default
   app.enableCors({
     origin: process.env.APP_URL ?? 'http://localhost:3000',

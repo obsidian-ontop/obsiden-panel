@@ -2,7 +2,7 @@
 Description=Obsidian Panel Web Frontend (Next.js)
 Documentation=https://github.com/obsidian-panel/panel
 After=network.target obsidian-api.service
-Requires=obsidian-api.service
+Wants=obsidian-api.service
 
 [Service]
 Type=simple
@@ -12,7 +12,7 @@ WorkingDirectory=/var/www/obsidian/apps/web
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=API_URL=http://127.0.0.1:3001
-ExecStart=/usr/bin/node /var/www/obsidian/apps/web/node_modules/.bin/next start -p 3000
+ExecStart=/var/www/obsidian/apps/web/node_modules/.bin/next start -p 3000
 
 # Crash auto-recovery & restart policy (Pterodactyl-style)
 Restart=always

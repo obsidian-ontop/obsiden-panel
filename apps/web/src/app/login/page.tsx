@@ -31,7 +31,7 @@ export default function LoginPage() {
       if (res.requiresTotp) {
         setRequiresTotp(true);
       } else {
-        router.push('/servers');
+        window.location.href = '/servers';
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify credentials.');

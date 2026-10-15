@@ -35,8 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const data = await fetchApi<{ user: User }>('/api/auth/me');
-      setUser(data.user);
+      const res = await fetchApi<any>('/api/auth/me');
+      const u = res?.data ?? res?.user ?? res;
+      if (u && (u.id || u.username)) {
+        setUser(u);
+      } else {
+        setUser(null);
+      }
     } catch {
       setUser(null);
     } finally {
@@ -49,15 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (credentials: { username: string; password: string; totpToken?: string }) => {
-    const res = await fetchApi<{ user?: User; requiresTotp?: boolean }>('/api/auth/login', {
+    const res = await fetchApi<any>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
 
-    if (res.user) {
-      setUser(res.user);
+    const u = res?.data?.user ?? res?.user ?? res?.data;
+    if (u && (u.id || u.username)) {
+      setUser(u);
     }
-    return res;
+    return {
+      requiresTotp: res?.data?.confirmationToken === 'totp_required' || res?.requiresTotp,
+      ...res,
+    };
   };
 
   const logout = async () => {
