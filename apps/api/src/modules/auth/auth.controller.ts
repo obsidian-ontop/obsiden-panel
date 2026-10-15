@@ -55,12 +55,8 @@ export class AuthController {
       throw new UnauthorizedException('Invalid username/email or password.');
     }
 
-    // Require email verification for non-admin users
-    if (!user.emailVerifiedAt && !user.isAdmin) {
-      throw new UnauthorizedException(
-        'Please check your email and verify your account before logging in.',
-      );
-    }
+    // Allow login for all users; unverified users will see the email verification banner in the panel header
+    // with an interactive button to resend verification.
 
     // Check if TOTP is enabled — if so, return a challenge token
     if (user.totpEnabled) {

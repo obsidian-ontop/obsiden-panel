@@ -366,21 +366,27 @@ export class AuthService {
   /**
    * Request a password reset link sent via SMTP.
    */
-  async forgotPassword(email: string): Promise<{ message: string }> {
-    const cleanEmail = email.trim().toLowerCase();
+  async forgotPassword(emailOrUsername: string): Promise<{ message: string }> {
+    const identifier = (emailOrUsername || '').trim();
     const genericResponse = {
-      message: 'If an account exists with that email address, a password reset link has been sent.',
+      message: 'If an account exists with that email or username, a password reset link has been sent.',
     };
 
-    const user = await this.prisma.user.findUnique({
-      where: { email: cleanEmail },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier.toLowerCase() },
+          { username: { equals: identifier, mode: 'insensitive' } },
+        ],
+      },
     });
 
     if (!user) {
-      // Do not disclose whether email exists
+      // Do not disclose whether account exists
       return genericResponse;
     }
 
+    const cleanEmail = user.email;
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour

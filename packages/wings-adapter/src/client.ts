@@ -154,11 +154,11 @@ export class WingsClient {
 
   // ─── Server Lifecycle ──────────────────────────────────────────────
 
-  /**
-   * Provision a server container on Wings according to Wings configuration schema.
-   */
-  async createServer(serverConfig: WingsServerConfiguration): Promise<void> {
-    await this.executeRequest('/api/servers', 'POST', serverConfig);
+  async createServer(payload: { uuid: string; start_on_completion?: boolean } | WingsServerConfiguration | any): Promise<void> {
+    const body = payload?.uuid
+      ? { uuid: payload.uuid, start_on_completion: Boolean(payload.start_on_completion) }
+      : { uuid: payload?.settings?.uuid, start_on_completion: false };
+    await this.executeRequest('/api/servers', 'POST', body);
   }
 
   /**

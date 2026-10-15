@@ -95,6 +95,7 @@ export class MailService {
       return true;
     } catch (error: any) {
       this.logger.error(`Failed to send verification email to ${to}: ${error.message}`);
+      this.logger.warn(`👉 [FALLBACK VERIFICATION LINK]: ${verifyUrl}`);
       return false;
     }
   }
@@ -157,6 +158,7 @@ export class MailService {
       return true;
     } catch (error: any) {
       this.logger.error(`Failed to send password reset email to ${to}: ${error.message}`);
+      this.logger.warn(`👉 [FALLBACK PASSWORD RESET LINK]: ${resetUrl}`);
       return false;
     }
   }

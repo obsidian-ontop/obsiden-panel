@@ -239,12 +239,13 @@ export class ServersService {
       return s;
     });
 
-    // Provision on Wings
+    // Provision on Wings using Wings installer payload { uuid, start_on_completion }
     try {
-      const fullServer = await this.getServerByUuid(createdServer.uuid);
-      const wingsConfig = this.wingsRemoteService.buildServerConfiguration(fullServer as any);
       const client = this.getWingsClient(node);
-      await client.createServer(wingsConfig as any);
+      await client.createServer({
+        uuid: createdServer.uuid,
+        start_on_completion: false,
+      });
       this.logger.log(`Server ${createdServer.uuid} successfully provisioned to Wings node ${node.name}`);
     } catch (err: any) {
       this.logger.error(`Failed to push server ${createdServer.uuid} to Wings: ${err.message}`);
