@@ -57,6 +57,9 @@ export class ServersService {
         egg: {
           select: { id: true, name: true },
         },
+        owner: {
+          select: { id: true, username: true, email: true },
+        },
         subusers: {
           where: { userId },
           select: { permissions: true },
@@ -74,6 +77,7 @@ export class ServersService {
       status: s.status,
       node: s.node.name,
       allocation: `${s.allocation.alias || s.allocation.ip}:${s.allocation.port}`,
+      owner: s.owner ? { id: s.owner.id, username: s.owner.username, email: s.owner.email } : null,
       limits: {
         memory: s.memory,
         swap: s.swap,

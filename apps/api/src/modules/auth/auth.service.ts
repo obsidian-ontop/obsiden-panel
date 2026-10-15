@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { hash, verify } from 'argon2';
 import { randomBytes, createHash } from 'crypto';
+import * as jwt from 'jsonwebtoken';
 import type { User } from '@prisma/client';
 
 @Injectable()
@@ -154,8 +155,8 @@ export class AuthService {
     const uniqueId = randomBytes(16).toString('hex');
     const now = Math.floor(Date.now() / 1000);
 
-    // Sign JWT with the node's daemon token
-    const token = this.jwt.sign(
+    // Sign JWT with the node's daemon token directly via jsonwebtoken to avoid options.expiresIn collision
+    const token = jwt.sign(
       {
         iss: panelUrl,
         aud: [`${node.fqdn}:${node.daemonPort}`],
@@ -169,8 +170,9 @@ export class AuthService {
         user_id: userId,
         unique_id: uniqueId,
       },
+      node.daemonToken,
       {
-        secret: node.daemonToken,
+        algorithm: 'HS256',
       },
     );
 
