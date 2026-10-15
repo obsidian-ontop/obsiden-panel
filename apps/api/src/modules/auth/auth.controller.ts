@@ -33,25 +33,33 @@ export class AuthController {
    */
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOperation({ summary: 'Login with username/email and password' })
   async login(
-    @Body() body: { email: string; password: string },
+    @Body() body: { email?: string; username?: string; password?: string },
     @Req() req: any,
     @Res({ passthrough: true }) res: any,
   ) {
-    const user = await this.authService.validateCredentials(body.email, body.password);
+    const identifier = body.username || body.email;
+    const user = await this.authService.validateCredentials(identifier, body.password);
 
     if (!user) {
       // Log failed attempt
       await this.prisma.auditLog.create({
         data: {
           action: 'auth:login.fail',
-          metadata: { email: body.email },
+          metadata: { identifier: identifier || 'unknown' },
           device: { ip: req.ip, userAgent: req.headers['user-agent'] ?? '' },
         },
       });
 
-      throw new UnauthorizedException('Invalid email or password.');
+      throw new UnauthorizedException('Invalid username/email or password.');
+    }
+
+    // Require email verification for non-admin users
+    if (!user.emailVerifiedAt && !user.isAdmin) {
+      throw new UnauthorizedException(
+        'Please check your email and verify your account before logging in.',
+      );
     }
 
     // Check if TOTP is enabled — if so, return a challenge token
@@ -199,5 +207,49 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke a session' })
   async revokeSession(@Req() req: any, @Param('id') sessionId: string) {
     await this.authService.revokeSession(sessionId, req.user.id);
+  }
+
+  /**
+   * POST /api/auth/register
+   * Create a new user account with email verification.
+   */
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new account' })
+  async register(
+    @Body() body: { email: string; username: string; password: string },
+  ) {
+    return this.authService.register(body.email, body.username, body.password);
+  }
+
+  /**
+   * POST /api/auth/verify-email
+   * Verify account using verification token.
+   */
+  @Post('verify-email')
+  @ApiOperation({ summary: 'Verify email address' })
+  async verifyEmail(@Body() body: { email: string; token: string }) {
+    return this.authService.verifyEmail(body.email, body.token);
+  }
+
+  /**
+   * POST /api/auth/forgot-password
+   * Request password reset link via SMTP.
+   */
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset email' })
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  /**
+   * POST /api/auth/reset-password
+   * Reset account password with token.
+   */
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset account password' })
+  async resetPassword(
+    @Body() body: { email: string; token: string; password: string },
+  ) {
+    return this.authService.resetPassword(body.email, body.token, body.password);
   }
 }

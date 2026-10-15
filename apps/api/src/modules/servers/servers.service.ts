@@ -495,9 +495,9 @@ export class ServersService {
 
     const existing = await this.prisma.subuser.findUnique({
       where: {
-        serverId_userId: {
-          serverId: server.id,
+        userId_serverId: {
           userId: targetUser.id,
+          serverId: server.id,
         },
       },
     });

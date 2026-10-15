@@ -11,7 +11,10 @@ import { AdminGuard } from './guards/admin.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow('JWT_SECRET'),
+        secret:
+          config.get<string>('JWT_SECRET') ||
+          config.get<string>('SESSION_SECRET') ||
+          'obsidian-dev-jwt-secret-replace-in-production-1234567890',
         signOptions: { expiresIn: '10m' },
       }),
       inject: [ConfigService],

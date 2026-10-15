@@ -87,12 +87,14 @@ export class ServerAccessGuard implements CanActivate {
     }
 
     const hasAll = requiredPermissions.every((perm) =>
-      hasPermission({
-        permissions: subuser.permissions,
-        isAdmin: false,
-        isOwner: false,
-        requiredPermission: perm,
-      }),
+      hasPermission(
+        {
+          permissions: subuser.permissions,
+          isAdmin: false,
+          isOwner: false,
+        },
+        perm,
+      ),
     );
 
     if (!hasAll) {

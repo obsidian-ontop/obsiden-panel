@@ -15,7 +15,7 @@ import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import { ServersService } from './servers.service';
 import { SessionGuard } from '../auth/guards/session.guard';
 import { ServerAccessGuard, RequirePermissions } from './guards/server-access.guard';
-import { PERMISSIONS } from '@obsidian/permissions';
+import { Permission } from '@obsidian/permissions';
 
 @ApiTags('Client Servers')
 @ApiCookieAuth()
@@ -39,7 +39,7 @@ export class ClientServersController {
 
   @Get(':uuid/ws')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.CONTROL_CONSOLE)
+  @RequirePermissions(Permission.CONTROL_CONSOLE)
   @ApiOperation({ summary: 'Get WebSocket credentials for live console and metrics' })
   async getWebSocketCredentials(@Param('uuid') uuid: string, @Req() req: any) {
     return this.serversService.getWebSocketCredentials(uuid, req.user);
@@ -57,7 +57,7 @@ export class ClientServersController {
 
   @Post(':uuid/command')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.CONTROL_CONSOLE)
+  @RequirePermissions(Permission.CONTROL_CONSOLE)
   @ApiOperation({ summary: 'Send command to game console' })
   async sendCommand(
     @Param('uuid') uuid: string,
@@ -70,7 +70,7 @@ export class ClientServersController {
 
   @Get(':uuid/files/list')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.FILE_READ)
+  @RequirePermissions(Permission.FILE_READ)
   @ApiOperation({ summary: 'List files in directory' })
   async listFiles(
     @Param('uuid') uuid: string,
@@ -81,7 +81,7 @@ export class ClientServersController {
 
   @Get(':uuid/files/contents')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.FILE_READ)
+  @RequirePermissions(Permission.FILE_READ)
   @ApiOperation({ summary: 'Get file content' })
   async getFileContents(
     @Param('uuid') uuid: string,
@@ -92,7 +92,7 @@ export class ClientServersController {
 
   @Post(':uuid/files/write')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.FILE_UPDATE)
+  @RequirePermissions(Permission.FILE_UPDATE)
   @ApiOperation({ summary: 'Write file content' })
   async writeFile(
     @Param('uuid') uuid: string,
@@ -104,7 +104,7 @@ export class ClientServersController {
 
   @Post(':uuid/files/rename')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.FILE_UPDATE)
+  @RequirePermissions(Permission.FILE_UPDATE)
   @ApiOperation({ summary: 'Rename or move files' })
   async renameFiles(
     @Param('uuid') uuid: string,
@@ -115,7 +115,7 @@ export class ClientServersController {
 
   @Post(':uuid/files/delete')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.FILE_DELETE)
+  @RequirePermissions(Permission.FILE_DELETE)
   @ApiOperation({ summary: 'Delete files or folders' })
   async deleteFiles(
     @Param('uuid') uuid: string,
@@ -128,7 +128,7 @@ export class ClientServersController {
 
   @Get(':uuid/backups')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.BACKUP_READ)
+  @RequirePermissions(Permission.BACKUP_READ)
   @ApiOperation({ summary: 'List server backups' })
   async listBackups(@Param('uuid') uuid: string) {
     return this.serversService.listBackups(uuid);
@@ -136,7 +136,7 @@ export class ClientServersController {
 
   @Post(':uuid/backups')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.BACKUP_CREATE)
+  @RequirePermissions(Permission.BACKUP_CREATE)
   @ApiOperation({ summary: 'Create a backup' })
   async createBackup(
     @Param('uuid') uuid: string,
@@ -147,7 +147,7 @@ export class ClientServersController {
 
   @Delete(':uuid/backups/:backupUuid')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.BACKUP_DELETE)
+  @RequirePermissions(Permission.BACKUP_DELETE)
   @ApiOperation({ summary: 'Delete backup' })
   async deleteBackup(
     @Param('uuid') uuid: string,
@@ -158,7 +158,7 @@ export class ClientServersController {
 
   @Post(':uuid/backups/:backupUuid/restore')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.BACKUP_RESTORE)
+  @RequirePermissions(Permission.BACKUP_RESTORE)
   @ApiOperation({ summary: 'Restore server from backup' })
   async restoreBackup(
     @Param('uuid') uuid: string,
@@ -172,7 +172,7 @@ export class ClientServersController {
 
   @Get(':uuid/subusers')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.USER_READ)
+  @RequirePermissions(Permission.USER_READ)
   @ApiOperation({ summary: 'List server subusers' })
   async listSubusers(@Param('uuid') uuid: string) {
     return this.serversService.listSubusers(uuid);
@@ -180,7 +180,7 @@ export class ClientServersController {
 
   @Post(':uuid/subusers')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.USER_CREATE)
+  @RequirePermissions(Permission.USER_CREATE)
   @ApiOperation({ summary: 'Add a subuser' })
   async addSubuser(
     @Param('uuid') uuid: string,
@@ -191,7 +191,7 @@ export class ClientServersController {
 
   @Patch(':uuid/subusers/:subuserId')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.USER_UPDATE)
+  @RequirePermissions(Permission.USER_UPDATE)
   @ApiOperation({ summary: 'Update subuser permissions' })
   async updateSubuser(
     @Param('uuid') uuid: string,
@@ -203,7 +203,7 @@ export class ClientServersController {
 
   @Delete(':uuid/subusers/:subuserId')
   @UseGuards(ServerAccessGuard)
-  @RequirePermissions(PERMISSIONS.USER_DELETE)
+  @RequirePermissions(Permission.USER_DELETE)
   @ApiOperation({ summary: 'Remove a subuser' })
   async deleteSubuser(
     @Param('uuid') uuid: string,

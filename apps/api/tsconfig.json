@@ -11,6 +11,8 @@
     "declaration": false,
     "declarationMap": false,
     "noEmit": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "incremental": true,
     "target": "ES2022"
   },

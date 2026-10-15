@@ -12,9 +12,11 @@ import { EggsModule } from './modules/eggs/eggs.module';
 import { ServersModule } from './modules/servers/servers.module';
 import { WingsRemoteModule } from './modules/wings-remote/wings-remote.module';
 import { HealthModule } from './modules/health/health.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],

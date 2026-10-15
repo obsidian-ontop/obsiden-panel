@@ -10,6 +10,7 @@
   },
   "packageManager": "pnpm@9.12.3",
   "scripts": {
+    "predev": "node -e \"try{fs.rmSync('apps/web/.next',{recursive:true,force:true})}catch(e){}\"",
     "build": "pnpm -r build",
     "dev": "pnpm -r --parallel dev",
     "dev:api": "pnpm --filter @obsidian/api dev",

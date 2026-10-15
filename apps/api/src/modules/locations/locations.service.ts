@@ -26,7 +26,6 @@ export class LocationsService {
             uuid: true,
             name: true,
             fqdn: true,
-            isPublic: true,
             behindProxy: true,
             memory: true,
             disk: true,

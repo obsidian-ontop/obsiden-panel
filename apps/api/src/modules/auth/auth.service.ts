@@ -1,7 +1,8 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { hash, verify } from 'argon2';
 import { randomBytes, createHash } from 'crypto';
 import type { User } from '@prisma/client';
@@ -14,6 +15,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -40,12 +42,20 @@ export class AuthService {
   }
 
   /**
-   * Authenticate a user by email and password.
+   * Authenticate a user by username or email and password.
    * Returns the user if credentials are valid, null otherwise.
    */
-  async validateCredentials(email: string, password: string): Promise<User | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+  async validateCredentials(identifier?: string, password?: string): Promise<User | null> {
+    if (!identifier || !password) return null;
+
+    const trimmed = identifier.trim();
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: trimmed.toLowerCase() },
+          { username: trimmed },
+        ],
+      },
     });
 
     if (!user) return null;
@@ -196,5 +206,209 @@ export class AuthService {
         emailVerifiedAt: new Date(),
       },
     });
+  }
+
+  /**
+   * Register a new user account with email verification.
+   */
+  async register(
+    email: string,
+    username: string,
+    password: string,
+  ): Promise<{ message: string; requiresVerification: boolean }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim();
+
+    if (!cleanEmail || !cleanUsername || !password) {
+      throw new BadRequestException('All fields (email, username, password) are required.');
+    }
+
+    if (password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters long.');
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: cleanEmail }, { username: cleanUsername }],
+      },
+    });
+
+    if (existingUser) {
+      if (existingUser.email === cleanEmail) {
+        throw new ConflictException('An account with this email address already exists.');
+      }
+      throw new ConflictException('This username is already taken.');
+    }
+
+    const passwordHash = await this.hashPassword(password);
+    const userCount = await this.prisma.user.count();
+    const isFirstUser = userCount === 0;
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: cleanEmail,
+        username: cleanUsername,
+        password: passwordHash,
+        isAdmin: isFirstUser,
+        emailVerifiedAt: isFirstUser ? new Date() : null,
+      },
+    });
+
+    if (isFirstUser) {
+      return {
+        message: 'Master administrator account created and automatically verified.',
+        requiresVerification: false,
+      };
+    }
+
+    // Generate secure email verification token
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Clean up any older pending verification requests for this email
+    await this.prisma.passwordReset.deleteMany({
+      where: { email: `verify:${cleanEmail}` },
+    });
+
+    await this.prisma.passwordReset.create({
+      data: {
+        email: `verify:${cleanEmail}`,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    await this.mailService.sendVerificationEmail(cleanEmail, cleanUsername, rawToken);
+
+    return {
+      message: 'Account created! Please check your email to verify your account before logging in.',
+      requiresVerification: true,
+    };
+  }
+
+  /**
+   * Verify an email address using the emailed verification token.
+   */
+  async verifyEmail(email: string, token: string): Promise<{ message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const tokenHash = createHash('sha256').update(token.trim()).digest('hex');
+
+    const record = await this.prisma.passwordReset.findFirst({
+      where: {
+        email: `verify:${cleanEmail}`,
+        tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Invalid or expired email verification link.');
+    }
+
+    await this.prisma.user.updateMany({
+      where: { email: cleanEmail },
+      data: { emailVerifiedAt: new Date() },
+    });
+
+    await this.prisma.passwordReset.delete({
+      where: { id: record.id },
+    });
+
+    return { message: 'Your email address has been successfully verified! You can now log in.' };
+  }
+
+  /**
+   * Request a password reset link sent via SMTP.
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const genericResponse = {
+      message: 'If an account exists with that email address, a password reset link has been sent.',
+    };
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      // Do not disclose whether email exists
+      return genericResponse;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.passwordReset.deleteMany({
+      where: { email: cleanEmail },
+    });
+
+    await this.prisma.passwordReset.create({
+      data: {
+        email: cleanEmail,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    await this.mailService.sendPasswordResetEmail(cleanEmail, user.username, rawToken);
+
+    return genericResponse;
+  }
+
+  /**
+   * Reset a user password using a valid reset token.
+   */
+  async resetPassword(email: string, token: string, newPassword: string): Promise<{ message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters long.');
+    }
+
+    const tokenHash = createHash('sha256').update(token.trim()).digest('hex');
+
+    const record = await this.prisma.passwordReset.findFirst({
+      where: {
+        email: cleanEmail,
+        tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Invalid or expired password reset link.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    const passwordHash = await this.hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: passwordHash,
+        // Also verify email if they proved ownership of the inbox
+        emailVerifiedAt: user.emailVerifiedAt || new Date(),
+      },
+    });
+
+    // Invalidate all existing sessions for this user for security
+    await this.prisma.session.deleteMany({
+      where: { userId: user.id },
+    });
+
+    // Delete used reset token
+    await this.prisma.passwordReset.delete({
+      where: { id: record.id },
+    });
+
+    return { message: 'Your password has been successfully reset. You can now log in.' };
   }
 }

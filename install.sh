@@ -108,6 +108,31 @@ fi
 APP_URL="${SCHEME}://${FQDN}"
 echo -e "\n${GREEN}[*] Application URL configured to: ${BOLD}${APP_URL}${NC}"
 
+# Optional SMTP Email Configuration (Gmail, SendGrid, etc.)
+echo -e "\n${BOLD}Email / SMTP Configuration (Gmail, SendGrid, etc.):${NC}"
+echo -e "Enables automatic Gmail verification emails and password reset links for users."
+read -p "Do you want to configure SMTP now? [y/N]: " CONFIGURE_SMTP
+
+SMTP_HOST=""
+SMTP_PORT="587"
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM=""
+
+if [[ "$CONFIGURE_SMTP" =~ ^[Yy]$ ]]; then
+    read -p "SMTP Host (e.g. smtp.gmail.com): " SMTP_HOST
+    read -p "SMTP Port [587]: " INPUT_SMTP_PORT
+    SMTP_PORT=${INPUT_SMTP_PORT:-587}
+    read -p "SMTP Username / Gmail Address: " SMTP_USER
+    read -s -p "SMTP Password / Gmail App Password: " SMTP_PASS
+    echo ""
+    read -p "From Address [default: \"Obsidian Panel\" <noreply@$FQDN>]: " INPUT_SMTP_FROM
+    SMTP_FROM=${INPUT_SMTP_FROM:-"\"Obsidian Panel\" <noreply@$FQDN>"}
+    echo -e "${GREEN}[*] SMTP configured for ${SMTP_USER} on ${SMTP_HOST}:${SMTP_PORT}.${NC}"
+else
+    echo -e "${YELLOW}[!] Skipping SMTP configuration. Account verification and reset links will be written to server logs.${NC}"
+fi
+
 # ------------------------------------------------------------------------------
 # 3. Install System Packages & Node.js 20 LTS
 # ------------------------------------------------------------------------------
@@ -350,6 +375,8 @@ fi
 cd "$INSTALL_DIR"
 
 # Write production .env file with local database connection
+JWT_SECRET=$(openssl rand -hex 32)
+
 cat << EOF > "$INSTALL_DIR/.env"
 NODE_ENV=production
 PORT=3001
@@ -357,7 +384,13 @@ APP_URL=$APP_URL
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}?schema=public
 REDIS_URL=redis://127.0.0.1:6379
 SESSION_SECRET=$SESSION_SECRET
+JWT_SECRET=$JWT_SECRET
 COOKIE_SECURE=$( [ "$USE_SSL" = true ] && echo "true" || echo "false" )
+SMTP_HOST=$SMTP_HOST
+SMTP_PORT=$SMTP_PORT
+SMTP_USER=$SMTP_USER
+SMTP_PASS=$SMTP_PASS
+SMTP_FROM=$SMTP_FROM
 EOF
 
 cat << EOF > "$INSTALL_DIR/apps/api/.env"
@@ -367,7 +400,13 @@ APP_URL=$APP_URL
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}?schema=public
 REDIS_URL=redis://127.0.0.1:6379
 SESSION_SECRET=$SESSION_SECRET
+JWT_SECRET=$JWT_SECRET
 COOKIE_SECURE=$( [ "$USE_SSL" = true ] && echo "true" || echo "false" )
+SMTP_HOST=$SMTP_HOST
+SMTP_PORT=$SMTP_PORT
+SMTP_USER=$SMTP_USER
+SMTP_PASS=$SMTP_PASS
+SMTP_FROM=$SMTP_FROM
 EOF
 
 cat << EOF > "$INSTALL_DIR/apps/web/.env"

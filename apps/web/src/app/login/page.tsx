@@ -92,6 +92,12 @@ export default function LoginPage() {
                     <label className="text-xs font-medium text-text-secondary">
                       Password
                     </label>
+                    <a
+                      href="/forgot-password"
+                      className="text-[11px] text-primary hover:underline transition-colors"
+                    >
+                      Forgot password?
+                    </a>
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
@@ -144,6 +150,16 @@ export default function LoginPage() {
                 </>
               )}
             </Button>
+
+            <div className="text-center pt-2">
+              <span className="text-xs text-text-muted">Don't have an account? </span>
+              <a
+                href="/register"
+                className="text-xs text-primary font-medium hover:underline transition-colors"
+              >
+                Create one
+              </a>
+            </div>
           </form>
         </div>
 

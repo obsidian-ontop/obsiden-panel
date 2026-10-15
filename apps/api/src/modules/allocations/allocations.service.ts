@@ -49,7 +49,7 @@ export class AllocationsService {
     const portsToCreate = new Set<number>();
     for (const portEntry of dto.ports) {
       if (portEntry.includes('-')) {
-        const [startStr, endStr] = portEntry.split('-');
+        const [startStr = '', endStr = ''] = portEntry.split('-');
         const start = parseInt(startStr.trim(), 10);
         const end = parseInt(endStr.trim(), 10);
         if (isNaN(start) || isNaN(end) || start < 1024 || end > 65535 || start > end) {

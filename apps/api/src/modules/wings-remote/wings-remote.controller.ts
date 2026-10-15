@@ -82,7 +82,7 @@ export class WingsRemoteController {
       });
     }
 
-    await this.prisma.activityLog.createMany({ data: logs });
+    await this.prisma.activityLog.createMany({ data: logs as any });
 
     this.logger.debug(`Ingested ${logs.length} activity logs from Wings`);
     return { processed: logs.length };
