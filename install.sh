@@ -361,8 +361,8 @@ elif [ ! -f "$INSTALL_DIR/package.json" ]; then
     echo -e "${GREEN}[*] Downloading Obsidian Panel codebase via Git...${NC}"
     REPO_URL=${PANEL_REPO_URL:-""}
     if [ -z "$REPO_URL" ]; then
-        read -p "Enter Obsidian Panel Git Repository URL [or press Enter for default]: " INPUT_REPO_URL
-        REPO_URL=${INPUT_REPO_URL:-"https://github.com/obsidian-panel/panel.git"}
+        read -p "Enter Obsidian Panel Git Repository URL [default: https://github.com/obsidian-ontop/obsiden-panel.git]: " INPUT_REPO_URL
+        REPO_URL=${INPUT_REPO_URL:-"https://github.com/obsidian-ontop/obsiden-panel.git"}
     fi
     echo -e "${GREEN}[*] Cloning from ${REPO_URL}...${NC}"
     git clone "$REPO_URL" "$INSTALL_DIR" || {
