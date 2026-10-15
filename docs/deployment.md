@@ -19,13 +19,31 @@ Or via one-line curl:
 bash <(curl -sSL https://raw.githubusercontent.com/obsidian-panel/panel/main/install.sh)
 ```
 
-The installer will prompt you for:
-1. **Panel FQDN / Domain or IP:** (e.g. `panel.example.com` or `192.168.1.100`)
-2. **Protocol Selection:**
-   - **Option 1 (SSL / HTTPS):** Automatically requests and installs Let's Encrypt SSL via Certbot.
-   - **Option 2 (Non-SSL / HTTP):** Configures Nginx for plain HTTP on port 80 (ideal for local/internal setups or behind Cloudflare/HAProxy).
-3. **Nginx Auto-Install:** Automatically installs Nginx, creates `/etc/nginx/sites-available/obsidian.conf`, links it, enables WebSocket upgrades, and reloads Nginx.
-4. **Admin Credentials:** Prompts for administrator username, email, and password to initialize the first superuser.
+The installer provides an interactive menu as well as direct command-line flags:
+
+### Interactive Menu
+Running `bash install.sh` presents an interactive menu:
+- `[1] Install Obsidian Panel`
+- `[2] Delete / Uninstall Obsidian Panel`
+- `[3] Install Pterodactyl Wings (Daemon)`
+- `[4] Delete / Uninstall Pterodactyl Wings`
+- `[0] Exit`
+
+### Command-Line Arguments
+You can also invoke tasks directly:
+```bash
+# Install Obsidian Panel
+bash install.sh --install-panel
+
+# Completely Delete / Uninstall Obsidian Panel
+bash install.sh --delete-panel
+
+# Install Docker & Pterodactyl Wings Daemon
+bash install.sh --install-wings
+
+# Delete / Uninstall Pterodactyl Wings
+bash install.sh --delete-wings
+```
 
 ---
 
