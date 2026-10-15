@@ -86,22 +86,29 @@ export class AuthController {
       process.env.COOKIE_SECURE === 'true' ||
       (process.env.APP_URL?.startsWith('https://') ?? false);
 
-    // Set HttpOnly cookie (SSL or non-SSL safe)
+    const cookieHeader = `session=${token}; Path=/; Max-Age=${7 * 24 * 60 * 60}; HttpOnly; SameSite=Lax${isHttps ? '; Secure' : ''}`;
+
+    // Set cookie through all available Fastify / Node channels
     if (typeof res.setCookie === 'function') {
-      res.setCookie('session', token, {
-        httpOnly: true,
-        secure: isHttps,
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-      });
-    } else {
-      const cookieHeader = `session=${token}; Path=/; Max-Age=${7 * 24 * 60 * 60}; HttpOnly; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-      if (res.raw?.setHeader) {
+      try {
+        res.setCookie('session', token, {
+          httpOnly: true,
+          secure: isHttps,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      } catch {}
+    }
+    if (typeof res.header === 'function') {
+      try {
+        res.header('set-cookie', cookieHeader);
+      } catch {}
+    }
+    if (res.raw?.setHeader) {
+      try {
         res.raw.setHeader('Set-Cookie', cookieHeader);
-      } else if (res.header) {
-        res.header('Set-Cookie', cookieHeader);
-      }
+      } catch {}
     }
 
     // Log successful login
@@ -117,6 +124,7 @@ export class AuthController {
     return {
       data: {
         complete: true,
+        token,
         user: {
           id: user.id,
           uuid: user.uuid,
@@ -247,6 +255,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify email address' })
   async verifyEmail(@Body() body: { email: string; token: string }) {
     return this.authService.verifyEmail(body.email, body.token);
+  }
+
+  /**
+   * POST /api/auth/resend-verification
+   * Resend verification email.
+   */
+  @Post('resend-verification')
+  @ApiOperation({ summary: 'Resend email verification token' })
+  async resendVerification(@Body() body: { email: string }) {
+    return this.authService.resendVerification(body.email);
   }
 
   /**

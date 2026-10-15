@@ -332,7 +332,7 @@ server {
     client_max_body_size 100M;
 
     # Backend API & Wings Remote callbacks
-    location /api {
+    location ^~ /api/ {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -367,7 +367,7 @@ server {
     client_max_body_size 100M;
 
     # Backend API & Wings Remote callbacks
-    location /api {
+    location ^~ /api/ {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -783,6 +783,33 @@ EOF
 
     systemctl daemon-reload
     systemctl enable wings
+
+    # SSL / Let's Encrypt Certificate Setup for Node FQDN
+    echo -e "\n${BOLD}${CYAN}--- Node SSL Certificate (Let's Encrypt) ---${NC}"
+    echo "Wings communicates over secure HTTPS/WSS when configured with SSL."
+    read_input "Do you want to generate a free Let's Encrypt SSL certificate for this node? [Y/n]: " NODE_SSL_CHOICE
+    NODE_SSL_CHOICE=${NODE_SSL_CHOICE:-Y}
+
+    if [[ "$NODE_SSL_CHOICE" =~ ^[Yy]$ ]]; then
+        read_input "Enter Node FQDN (e.g. node1.example.com): " NODE_FQDN
+        read_input "Enter email for certificate renewal alerts: " NODE_CERT_EMAIL
+        if [ -n "$NODE_FQDN" ] && [ -n "$NODE_CERT_EMAIL" ]; then
+            apt-get install -y certbot
+            systemctl stop nginx 2>/dev/null || true
+            echo -e "${GREEN}[*] Requesting SSL certificate for ${NODE_FQDN}...${NC}"
+            certbot certonly --standalone -d "$NODE_FQDN" --non-interactive --agree-tos -m "$NODE_CERT_EMAIL" || {
+                echo -e "${YELLOW}[!] Standalone certbot failed. Trying standard certbot...${NC}"
+            }
+            if [ -f "/etc/letsencrypt/live/$NODE_FQDN/fullchain.pem" ]; then
+                echo -e "${GREEN}[✓] SSL Certificate successfully generated for ${NODE_FQDN}!${NC}"
+                echo -e "    Certificate: /etc/letsencrypt/live/${NODE_FQDN}/fullchain.pem"
+                echo -e "    Private Key: /etc/letsencrypt/live/${NODE_FQDN}/privkey.pem"
+                chmod -R 755 /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null || true
+            else
+                echo -e "${YELLOW}[!] Could not automatically generate certificate. Verify DNS points to this server.${NC}"
+            fi
+        fi
+    fi
 
     # Configuration Step
     echo -e "\n${BOLD}${CYAN}--- Wings Node Configuration ---${NC}"

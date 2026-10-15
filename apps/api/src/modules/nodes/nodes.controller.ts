@@ -45,7 +45,9 @@ export class NodesController {
       scheme?: string;
       behindProxy?: boolean;
       isPublic?: boolean;
+      daemonPort?: number;
       daemonListen?: number;
+      daemonSftpPort?: number;
       daemonSftp?: number;
       daemonBase?: string;
       memory: number;
@@ -55,7 +57,11 @@ export class NodesController {
       uploadSize?: number;
     },
   ) {
-    return this.nodesService.createNode(dto);
+    return this.nodesService.createNode({
+      ...dto,
+      daemonPort: dto.daemonPort ?? dto.daemonListen,
+      daemonSftpPort: dto.daemonSftpPort ?? dto.daemonSftp,
+    });
   }
 
   @Patch(':id')

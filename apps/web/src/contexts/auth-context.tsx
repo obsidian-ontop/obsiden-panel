@@ -11,6 +11,7 @@ export interface User {
   isAdmin: boolean;
   language: string;
   totpEnabled: boolean;
+  emailVerifiedAt?: string | null;
 }
 
 interface AuthContextType {
@@ -59,6 +60,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(credentials),
     });
 
+    const token = res?.data?.token ?? res?.token;
+    if (token && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('obsidian_session_token', token);
+        document.cookie = `session=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      } catch {}
+    }
+
     const u = res?.data?.user ?? res?.user ?? res?.data;
     if (u && (u.id || u.username)) {
       setUser(u);
@@ -73,6 +82,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetchApi('/api/auth/logout', { method: 'POST' });
     } finally {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('obsidian_session_token');
+          document.cookie = 'session=; path=/; max-age=0; SameSite=Lax';
+        } catch {}
+      }
       setUser(null);
       window.location.href = '/login';
     }

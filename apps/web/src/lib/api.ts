@@ -25,6 +25,16 @@ export async function fetchApi<T = any>(
     headers.set('Content-Type', 'application/json');
   }
 
+  // Dual-channel auth: Attach Bearer token from storage if present (fallback for cookies)
+  if (typeof window !== 'undefined') {
+    try {
+      const storedToken = localStorage.getItem('obsidian_session_token');
+      if (storedToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${storedToken}`);
+      }
+    } catch {}
+  }
+
   const res = await fetch(path, {
     ...options,
     headers,

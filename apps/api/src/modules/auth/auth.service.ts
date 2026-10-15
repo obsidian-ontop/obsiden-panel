@@ -319,6 +319,49 @@ export class AuthService {
   }
 
   /**
+   * Resend account verification email.
+   */
+  async resendVerification(emailOrUsername: string): Promise<{ message: string }> {
+    const clean = emailOrUsername.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: clean },
+          { username: clean },
+        ],
+      },
+    });
+
+    if (!user) {
+      return { message: 'If an account exists, a verification link has been sent.' };
+    }
+
+    if (user.emailVerifiedAt) {
+      return { message: 'Account email is already verified.' };
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.prisma.passwordReset.deleteMany({
+      where: { email: `verify:${user.email}` },
+    });
+
+    await this.prisma.passwordReset.create({
+      data: {
+        email: `verify:${user.email}`,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    await this.mailService.sendVerificationEmail(user.email, user.username, rawToken);
+
+    return { message: `Verification email sent to ${user.email}! Please check your inbox.` };
+  }
+
+  /**
    * Request a password reset link sent via SMTP.
    */
   async forgotPassword(email: string): Promise<{ message: string }> {

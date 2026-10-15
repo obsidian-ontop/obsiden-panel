@@ -17,26 +17,33 @@ export class SessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // Try session cookie first
+    // 1. Try session cookie from Fastify parsed cookies
     let sessionToken = request.cookies?.session;
-    if (!sessionToken && request.headers.cookie) {
+
+    // 2. Try raw Cookie header
+    if (!sessionToken && request.headers?.cookie) {
       const match = request.headers.cookie.match(/(?:^|;\s*)session=([^;]+)/);
       if (match) sessionToken = decodeURIComponent(match[1]);
     }
+
+    // 3. Try Bearer token from Authorization header
+    const authHeader = request.headers?.['authorization'] || request.headers?.authorization;
+    if (!sessionToken && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      sessionToken = authHeader.substring(7).trim();
+    }
+
+    // 4. Try X-Session-Token header
+    const xSession = request.headers?.['x-session-token'] || request.headers?.['X-Session-Token'];
+    if (!sessionToken && xSession) {
+      sessionToken = String(xSession).trim();
+    }
+
     if (sessionToken) {
       const user = await this.authService.validateSession(sessionToken);
       if (user) {
         request.user = user;
         return true;
       }
-    }
-
-    // Try Bearer token for API key auth
-    const authHeader = request.headers['authorization'];
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      // API key validation will be implemented in Phase 5
-      // For now, only session auth is supported
     }
 
     throw new UnauthorizedException('Authentication required.');
