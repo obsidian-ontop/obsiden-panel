@@ -484,12 +484,14 @@ EOF
     pnpm --filter @obsidian/wings-adapter build
 
     echo -e "${GREEN}[*] Generating Prisma database client and synchronizing schema...${NC}"
-    pnpm --filter @obsidian/api prisma:generate
+    cd "$INSTALL_DIR/apps/api"
+    npx prisma generate
     if [ -d "$INSTALL_DIR/apps/api/prisma/migrations" ]; then
-        pnpm --filter @obsidian/api prisma:migrate:deploy
+        npx prisma migrate deploy || npx prisma db push --accept-data-loss
     else
-        pnpm --filter @obsidian/api prisma db push --skip-generate
+        npx prisma db push --accept-data-loss
     fi
+    cd "$INSTALL_DIR"
 
     echo -e "${GREEN}[*] Building Next.js Web Frontend & NestJS Backend...${NC}"
     pnpm --filter @obsidian/api build
@@ -974,6 +976,10 @@ create_admin_user() {
     done
 
     echo -e "\n${GREEN}[*] Registering administrator credentials...${NC}"
+    cd "$PANEL_DIR/apps/api"
+    npx prisma generate 2>/dev/null || true
+    npx prisma db push --accept-data-loss 2>/dev/null || true
+    cd "$PANEL_DIR"
     pnpm --filter @obsidian/api run bootstrap -- --username "${ADMIN_USERNAME}" --email "${ADMIN_EMAIL}" --password "${ADMIN_PASSWORD}"
 
     echo -e "\n${GREEN}${BOLD}================================================================${NC}"
