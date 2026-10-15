@@ -71,7 +71,7 @@ echo -e "\n${BOLD}${CYAN}--- Configuration Setup ---${NC}"
 
 # FQDN
 while true; do
-    read -p "Enter the FQDN or IP for your Obsidian Panel (e.g. panel.example.com or 192.168.1.50): " FQDN
+    read -p "Enter the FQDN or IP for your Obsidian Panel (e.g. panel.example.com or vps ip): " FQDN
     FQDN=$(echo "$FQDN" | tr -d ' ' | tr '[:upper:]' '[:lower:]')
     if [ -n "$FQDN" ]; then
         break
