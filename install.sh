@@ -4,10 +4,11 @@
 # Optimized for Ubuntu 20.04/22.04/24.04 LTS & Debian 11/12
 #
 # Supported Operations:
-#   1) Install Obsidian Panel (Local DB, Redis, Node 20, Nginx, SSL, Systemd)
+#   1) Install Obsidian Panel (Admin user setup at start, auto DB, Redis, Nginx, SSL)
 #   2) Delete / Uninstall Obsidian Panel (Clean removal of services, files, DB)
 #   3) Install Pterodactyl Wings (Docker, Wings daemon binary, Systemd, Config)
 #   4) Delete / Uninstall Pterodactyl Wings (Daemon, Services, Volumes cleanup)
+#   5) Create / Reset Admin User (Bootstrap superuser CLI)
 # ==============================================================================
 
 set -e
@@ -21,7 +22,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # ------------------------------------------------------------------------------
-# Banner & Helpers
+# Banner & Terminal Input Helpers (Supports both bash <(curl ...) and curl | bash)
 # ------------------------------------------------------------------------------
 show_banner() {
     clear
@@ -37,6 +38,31 @@ show_banner() {
       Modern Game Server Management Panel & Wings Daemon Manager
 EOF
     echo -e "${NC}"
+}
+
+read_input() {
+    local prompt="$1"
+    local var_name="$2"
+    if [ -t 0 ]; then
+        read -p "$prompt" "$var_name"
+    elif [ -e /dev/tty ]; then
+        read -p "$prompt" "$var_name" < /dev/tty
+    else
+        read -p "$prompt" "$var_name"
+    fi
+}
+
+read_secret() {
+    local prompt="$1"
+    local var_name="$2"
+    if [ -t 0 ]; then
+        read -s -p "$prompt" "$var_name"
+    elif [ -e /dev/tty ]; then
+        read -s -p "$prompt" "$var_name" < /dev/tty
+    else
+        read -s -p "$prompt" "$var_name"
+    fi
+    echo ""
 }
 
 verify_root() {
@@ -60,7 +86,7 @@ verify_os() {
 
     if [[ "$OS" != "ubuntu" && "$OS" != "debian" ]]; then
         echo -e "${YELLOW}[WARNING] This script is optimized for Ubuntu and Debian.${NC}"
-        read -p "Do you want to continue anyway? [y/N]: " continue_anyway
+        read_input "Do you want to continue anyway? [y/N]: " continue_anyway
         if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
             exit 1
         fi
@@ -79,9 +105,46 @@ install_panel() {
     echo -e "${BOLD}${CYAN}            INSTALLING OBSIDIAN PANEL                           ${NC}"
     echo -e "${BOLD}${CYAN}================================================================${NC}\n"
 
-    # FQDN
+    # --------------------------------------------------------------------------
+    # Step A: Create Administrator User FIRST (before any package downloads/builds)
+    # --------------------------------------------------------------------------
+    echo -e "${BOLD}${CYAN}--- Step 1: Create Administrator Account ---${NC}"
+    echo -e "Enter your master administrator credentials upfront so installation runs hands-free:\n"
+
     while true; do
-        read -p "Enter the FQDN or IP for your Obsidian Panel (e.g. panel.example.com or vps IP): " FQDN
+        read_input "Admin Username: " ADMIN_USERNAME
+        ADMIN_USERNAME=$(echo "$ADMIN_USERNAME" | tr -d ' ')
+        if [ -n "$ADMIN_USERNAME" ]; then
+            break
+        fi
+        echo -e "${RED}Username cannot be empty.${NC}"
+    done
+
+    while true; do
+        read_input "Admin Email: " ADMIN_EMAIL
+        ADMIN_EMAIL=$(echo "$ADMIN_EMAIL" | tr -d ' ')
+        if [ -n "$ADMIN_EMAIL" ]; then
+            break
+        fi
+        echo -e "${RED}Email cannot be empty.${NC}"
+    done
+
+    while true; do
+        read_secret "Admin Password (min 8 chars): " ADMIN_PASSWORD
+        if [ ${#ADMIN_PASSWORD} -ge 8 ]; then
+            break
+        fi
+        echo -e "${RED}Password must be at least 8 characters long.${NC}"
+    done
+
+    echo -e "${GREEN}[✓] Admin account configured: ${ADMIN_USERNAME} (${ADMIN_EMAIL})${NC}\n"
+
+    # --------------------------------------------------------------------------
+    # Step B: Domain / FQDN & Protocol Setup
+    # --------------------------------------------------------------------------
+    echo -e "${BOLD}${CYAN}--- Step 2: Domain & Protocol Setup ---${NC}"
+    while true; do
+        read_input "Enter the FQDN or IP for your Obsidian Panel (e.g. panel.example.com or VPS IP): " FQDN
         FQDN=$(echo "$FQDN" | tr -d ' ' | tr '[:upper:]' '[:lower:]')
         if [ -n "$FQDN" ]; then
             break
@@ -89,11 +152,10 @@ install_panel() {
         echo -e "${RED}FQDN / Domain cannot be empty.${NC}"
     done
 
-    # SSL or Non-SSL Selection
     echo -e "\n${BOLD}Select Web Protocol:${NC}"
     echo "  1) SSL / HTTPS (Recommended — Automatic Let's Encrypt certificate)"
     echo "  2) Non-SSL / HTTP (Plain port 80 — For local networks, test labs, or reverse proxies)"
-    read -p "Choice [1/2, default: 1]: " SSL_CHOICE
+    read_input "Choice [1/2, default: 1]: " SSL_CHOICE
     SSL_CHOICE=${SSL_CHOICE:-1}
 
     USE_SSL=true
@@ -106,22 +168,19 @@ install_panel() {
         echo -e "${YELLOW}[!] Non-SSL mode selected. The Panel will be accessible over plain HTTP on port 80.${NC}"
     else
         echo -e "${GREEN}[*] SSL mode selected. Automatic Let's Encrypt certificates will be configured.${NC}"
-        while true; do
-            read -p "Enter admin email address for Let's Encrypt certificate renewal notices: " CERT_EMAIL
-            if [ -n "$CERT_EMAIL" ]; then
-                break
-            fi
-            echo -e "${RED}Email cannot be empty for SSL certificate registration.${NC}"
-        done
+        read_input "Enter email for Let's Encrypt renewal notices [default: $ADMIN_EMAIL]: " INPUT_CERT_EMAIL
+        CERT_EMAIL=${INPUT_CERT_EMAIL:-"$ADMIN_EMAIL"}
     fi
 
     APP_URL="${SCHEME}://${FQDN}"
-    echo -e "\n${GREEN}[*] Application URL configured to: ${BOLD}${APP_URL}${NC}"
+    echo -e "${GREEN}[✓] Application URL configured to: ${BOLD}${APP_URL}${NC}\n"
 
-    # Optional SMTP Email Configuration
-    echo -e "\n${BOLD}Email / SMTP Configuration (Gmail, SendGrid, etc.):${NC}"
+    # --------------------------------------------------------------------------
+    # Step C: Optional SMTP Configuration
+    # --------------------------------------------------------------------------
+    echo -e "${BOLD}${CYAN}--- Step 3: Email / SMTP Configuration ---${NC}"
     echo -e "Enables automatic account emails and password reset links for users."
-    read -p "Do you want to configure SMTP now? [y/N]: " CONFIGURE_SMTP
+    read_input "Do you want to configure SMTP now? [y/N]: " CONFIGURE_SMTP
 
     SMTP_HOST=""
     SMTP_PORT="587"
@@ -130,21 +189,24 @@ install_panel() {
     SMTP_FROM=""
 
     if [[ "$CONFIGURE_SMTP" =~ ^[Yy]$ ]]; then
-        read -p "SMTP Host (e.g. smtp.gmail.com): " SMTP_HOST
-        read -p "SMTP Port [587]: " INPUT_SMTP_PORT
+        read_input "SMTP Host (e.g. smtp.gmail.com): " SMTP_HOST
+        read_input "SMTP Port [587]: " INPUT_SMTP_PORT
         SMTP_PORT=${INPUT_SMTP_PORT:-587}
-        read -p "SMTP Username / Gmail Address: " SMTP_USER
-        read -s -p "SMTP Password / Gmail App Password: " SMTP_PASS
-        echo ""
-        read -p "From Address [default: \"Obsidian Panel\" <noreply@$FQDN>]: " INPUT_SMTP_FROM
+        read_input "SMTP Username / Gmail Address: " SMTP_USER
+        read_secret "SMTP Password / Gmail App Password: " SMTP_PASS
+        read_input "From Address [default: \"Obsidian Panel\" <noreply@$FQDN>]: " INPUT_SMTP_FROM
         SMTP_FROM=${INPUT_SMTP_FROM:-"\"Obsidian Panel\" <noreply@$FQDN>"}
-        echo -e "${GREEN}[*] SMTP configured for ${SMTP_USER} on ${SMTP_HOST}:${SMTP_PORT}.${NC}"
+        echo -e "${GREEN}[✓] SMTP configured for ${SMTP_USER} on ${SMTP_HOST}:${SMTP_PORT}.${NC}"
     else
         echo -e "${YELLOW}[!] Skipping SMTP configuration. Account verification and reset links will be written to server logs.${NC}"
     fi
 
-    # Install System Dependencies & Node.js 20 LTS
-    echo -e "\n${BOLD}${CYAN}--- Installing System Dependencies & Node.js 20 ---${NC}"
+    echo -e "\n${GREEN}${BOLD}[*] All configuration parameters collected! Starting automated installation...${NC}\n"
+
+    # --------------------------------------------------------------------------
+    # Step D: Install System Dependencies & Node.js 20 LTS
+    # --------------------------------------------------------------------------
+    echo -e "${BOLD}${CYAN}--- Installing System Dependencies & Node.js 20 ---${NC}"
     apt-get update -y
     apt-get install -y curl wget git jq openssl ca-certificates gnupg lsb-release build-essential nginx
 
@@ -165,7 +227,9 @@ install_panel() {
         apt-get install -y certbot python3-certbot-nginx
     fi
 
-    # Local Database Setup (PostgreSQL & Redis)
+    # --------------------------------------------------------------------------
+    # Step E: Local Database Setup (PostgreSQL & Redis)
+    # --------------------------------------------------------------------------
     echo -e "\n${BOLD}${CYAN}--- Setting Up Local PostgreSQL & Redis ---${NC}"
     apt-get install -y postgresql postgresql-contrib redis-server
     systemctl enable --now postgresql
@@ -203,7 +267,9 @@ install_panel() {
 
     echo -e "${GREEN}[*] Local PostgreSQL successfully configured on 127.0.0.1:5432.${NC}"
 
-    # SSL Certificate Request (if SSL selected)
+    # --------------------------------------------------------------------------
+    # Step F: SSL Certificate Request (if SSL selected)
+    # --------------------------------------------------------------------------
     if [ "$USE_SSL" = true ]; then
         echo -e "\n${BOLD}${CYAN}--- Requesting Let's Encrypt SSL Certificate ---${NC}"
         systemctl stop nginx || true
@@ -214,7 +280,7 @@ install_panel() {
             certbot certonly --nginx -d "$FQDN" --non-interactive --agree-tos -m "$CERT_EMAIL" || {
                 echo -e "${RED}[ERROR] Let's Encrypt certificate issuance failed.${NC}"
                 echo -e "${RED}Please verify that ${FQDN} points to this server IP address.${NC}"
-                read -p "Do you want to switch to Non-SSL mode and continue? [y/N]: " switch_non_ssl
+                read_input "Do you want to switch to Non-SSL mode and continue? [y/N]: " switch_non_ssl
                 if [[ "$switch_non_ssl" =~ ^[Yy]$ ]]; then
                     USE_SSL=false
                     SCHEME="http"
@@ -226,7 +292,9 @@ install_panel() {
         }
     fi
 
-    # Automatic Nginx Reverse Proxy Setup
+    # --------------------------------------------------------------------------
+    # Step G: Automatic Nginx Reverse Proxy Setup
+    # --------------------------------------------------------------------------
     echo -e "\n${BOLD}${CYAN}--- Configuring Nginx Reverse Proxy ---${NC}"
     NGINX_CONF="/etc/nginx/sites-available/obsidian.conf"
 
@@ -334,7 +402,9 @@ EOF
 
     echo -e "${GREEN}[*] Nginx configured and running.${NC}"
 
-    # Application Code Installation & Build
+    # --------------------------------------------------------------------------
+    # Step H: Application Code Installation & Build
+    # --------------------------------------------------------------------------
     echo -e "\n${BOLD}${CYAN}--- Building Application Components ---${NC}"
     INSTALL_DIR="/var/www/obsidian"
     mkdir -p "$INSTALL_DIR"
@@ -351,7 +421,7 @@ EOF
         echo -e "${GREEN}[*] Downloading Obsidian Panel codebase via Git...${NC}"
         REPO_URL=${PANEL_REPO_URL:-""}
         if [ -z "$REPO_URL" ]; then
-            read -p "Enter Obsidian Panel Git Repository URL [default: https://github.com/obsidian-ontop/obsiden-panel.git]: " INPUT_REPO_URL
+            read_input "Enter Obsidian Panel Git Repository URL [default: https://github.com/obsidian-ontop/obsiden-panel.git]: " INPUT_REPO_URL
             REPO_URL=${INPUT_REPO_URL:-"https://github.com/obsidian-ontop/obsiden-panel.git"}
         fi
         echo -e "${GREEN}[*] Cloning from ${REPO_URL}...${NC}"
@@ -436,7 +506,9 @@ EOF
     chown -R www-data:www-data "$INSTALL_DIR"
     chmod -R 755 "$INSTALL_DIR"
 
-    # Crash Support & Systemd Watchdogs
+    # --------------------------------------------------------------------------
+    # Step I: Crash Support & Systemd Watchdogs
+    # --------------------------------------------------------------------------
     echo -e "\n${BOLD}${CYAN}--- Configuring Crash Auto-Restart Services ---${NC}"
 
     cat << EOF > /etc/systemd/system/obsidian-api.service
@@ -506,22 +578,10 @@ EOF
 
     echo -e "${GREEN}[*] Obsidian systemd services enabled with crash auto-restart.${NC}"
 
-    # Initial Administrator Bootstrap
-    echo -e "\n${BOLD}${CYAN}--- Initial Administrator Bootstrap ---${NC}"
-    echo -e "Create your master administrator account:"
-
-    read -p "Admin Username: " ADMIN_USERNAME
-    read -p "Admin Email: " ADMIN_EMAIL
-    while true; do
-        read -s -p "Admin Password (min 8 chars): " ADMIN_PASSWORD
-        echo ""
-        if [ ${#ADMIN_PASSWORD} -ge 8 ]; then
-            break
-        fi
-        echo -e "${RED}Password must be at least 8 characters long.${NC}"
-    done
-
-    echo -e "\n${GREEN}[*] Bootstrapping administrator account...${NC}"
+    # --------------------------------------------------------------------------
+    # Step J: Apply Administrator Bootstrap (using credentials from Step A)
+    # --------------------------------------------------------------------------
+    echo -e "\n${BOLD}${CYAN}--- Bootstrapping Administrator Account ---${NC}"
     pnpm --filter @obsidian/api run bootstrap -- --username "${ADMIN_USERNAME}" --email "${ADMIN_EMAIL}" --password "${ADMIN_PASSWORD}"
 
     # Summary
@@ -541,7 +601,7 @@ EOF
     echo -e "  2. Sign in with username '${ADMIN_USERNAME}'."
     echo -e "  3. Go to ${BOLD}Administration → Locations${NC} to create your first location."
     echo -e "  4. Go to ${BOLD}Administration → Nodes${NC} to register your node."
-    echo -e "  5. Install Wings on your node server using this script: ${BOLD}bash install.sh --wings${NC}"
+    echo -e "  5. Install Wings on your node server using this script: ${BOLD}bash install.sh${NC} (Select [3] Install Wings)"
     echo -e "  6. Copy generated ${BOLD}config.yml${NC} to ${BOLD}/etc/pterodactyl/config.yml${NC} and start Wings.\n"
 }
 
@@ -561,7 +621,7 @@ delete_panel() {
     echo -e "  - Obsidian Nginx reverse proxy configuration"
     echo -e "  - Panel files in /var/www/obsidian"
     echo ""
-    read -p "Are you sure you want to proceed? Type 'DELETE' to confirm: " CONFIRM_DELETE
+    read_input "Are you sure you want to proceed? Type 'DELETE' to confirm: " CONFIRM_DELETE
     if [ "$CONFIRM_DELETE" != "DELETE" ]; then
         echo -e "${CYAN}[*] Deletion aborted. No changes were made.${NC}"
         return 0
@@ -587,7 +647,6 @@ delete_panel() {
 
     echo -e "${YELLOW}[*] Removing /var/www/obsidian directory...${NC}"
     if [ -d "/var/www/obsidian" ]; then
-        # Preserve currently executing install.sh if the user is running from /var/www/obsidian
         CURRENT_SCRIPT=$(realpath "$0" 2>/dev/null || echo "")
         if [[ "$CURRENT_SCRIPT" == /var/www/obsidian/* ]]; then
             echo -e "${YELLOW}[!] Current script is running inside /var/www/obsidian. Deleting application files around it...${NC}"
@@ -599,7 +658,7 @@ delete_panel() {
 
     # Database Deletion Option
     echo ""
-    read -p "Do you also want to DROP the PostgreSQL database 'obsidian_panel' and user 'obsidian'? [y/N]: " DROP_DB
+    read_input "Do you also want to DROP the PostgreSQL database 'obsidian_panel' and user 'obsidian'? [y/N]: " DROP_DB
     if [[ "$DROP_DB" =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}[*] Dropping database obsidian_panel and user obsidian...${NC}"
         sudo -u postgres psql -c "DROP DATABASE IF EXISTS obsidian_panel;" 2>/dev/null || true
@@ -617,9 +676,9 @@ delete_panel() {
     # SSL Certificate Deletion Option
     if command -v certbot &> /dev/null; then
         echo ""
-        read -p "Do you want to delete Certbot SSL certificates for this panel domain? [y/N]: " DELETE_CERT
+        read_input "Do you want to delete Certbot SSL certificates for this panel domain? [y/N]: " DELETE_CERT
         if [[ "$DELETE_CERT" =~ ^[Yy]$ ]]; then
-            read -p "Enter the domain name certificate to delete: " CERT_DOMAIN
+            read_input "Enter the domain name certificate to delete: " CERT_DOMAIN
             if [ -n "$CERT_DOMAIN" ]; then
                 certbot delete --cert-name "$CERT_DOMAIN" --non-interactive 2>/dev/null || true
                 echo -e "${GREEN}[*] Certbot certificate for $CERT_DOMAIN deleted.${NC}"
@@ -729,7 +788,7 @@ EOF
     echo "  1) Paste YAML configuration content directly from Obsidian Panel"
     echo "  2) Paste the auto-configure command (wings configure --panel-url ...)"
     echo "  3) I will configure /etc/pterodactyl/config.yml manually later"
-    read -p "Choice [1/2/3, default: 1]: " CONFIG_CHOICE
+    read_input "Choice [1/2/3, default: 1]: " CONFIG_CHOICE
     CONFIG_CHOICE=${CONFIG_CHOICE:-1}
 
     CONFIGURED=false
@@ -739,7 +798,15 @@ EOF
         echo -e "${YELLOW}When finished, press ENTER, then type ${BOLD}EOF${NC}${YELLOW} on a new line and press ENTER:${NC}\n"
         
         TMP_CONF=$(mktemp)
-        while IFS= read -r line; do
+        if [ -t 0 ]; then
+            INPUT_SRC="/dev/stdin"
+        elif [ -e /dev/tty ]; then
+            INPUT_SRC="/dev/tty"
+        else
+            INPUT_SRC="/dev/stdin"
+        fi
+
+        while IFS= read -r line < "$INPUT_SRC"; do
             if [ "$line" == "EOF" ]; then
                 break
             fi
@@ -757,7 +824,7 @@ EOF
         fi
     elif [ "$CONFIG_CHOICE" == "2" ]; then
         echo -e "\n${YELLOW}Paste the full wings configure command from Obsidian Panel:${NC}"
-        read -p "> " AUTO_CONF_CMD
+        read_input "> " AUTO_CONF_CMD
         if [ -n "$AUTO_CONF_CMD" ]; then
             eval "$AUTO_CONF_CMD" || echo -e "${RED}[!] wings configure returned an error. Check credentials.${NC}"
             if [ -f "/etc/pterodactyl/config.yml" ]; then
@@ -822,7 +889,7 @@ delete_wings() {
     echo -e "  - Stops and removes the wings systemd service"
     echo -e "  - Deletes /usr/local/bin/wings"
     echo ""
-    read -p "Are you sure you want to proceed? Type 'DELETE' to confirm: " CONFIRM_DELETE
+    read_input "Are you sure you want to proceed? Type 'DELETE' to confirm: " CONFIRM_DELETE
     if [ "$CONFIRM_DELETE" != "DELETE" ]; then
         echo -e "${CYAN}[*] Deletion aborted. No changes were made.${NC}"
         return 0
@@ -841,7 +908,7 @@ delete_wings() {
 
     # Clean Configuration Directory
     echo ""
-    read -p "Do you want to delete Wings configurations in /etc/pterodactyl? [y/N]: " DEL_CONFIG
+    read_input "Do you want to delete Wings configurations in /etc/pterodactyl? [y/N]: " DEL_CONFIG
     if [[ "$DEL_CONFIG" =~ ^[Yy]$ ]]; then
         rm -rf /etc/pterodactyl
         echo -e "${GREEN}[*] Removed /etc/pterodactyl.${NC}"
@@ -849,7 +916,7 @@ delete_wings() {
 
     # Clean Server Data / Volumes
     echo ""
-    read -p "Do you want to delete all server volume data in /var/lib/pterodactyl? (CAUTION: Deletes game server files!) [y/N]: " DEL_VOLUMES
+    read_input "Do you want to delete all server volume data in /var/lib/pterodactyl? (CAUTION: Deletes game server files!) [y/N]: " DEL_VOLUMES
     if [[ "$DEL_VOLUMES" =~ ^[Yy]$ ]]; then
         rm -rf /var/lib/pterodactyl
         echo -e "${GREEN}[*] Removed /var/lib/pterodactyl.${NC}"
@@ -858,6 +925,62 @@ delete_wings() {
     echo -e "\n${GREEN}${BOLD}================================================================${NC}"
     echo -e "${GREEN}${BOLD}       PTERODACTYL WINGS HAS BEEN REMOVED                      ${NC}"
     echo -e "${GREEN}${BOLD}================================================================${NC}\n"
+}
+
+# ------------------------------------------------------------------------------
+# 5. CREATE / RESET ADMIN USER (BOOTSTRAP)
+# ------------------------------------------------------------------------------
+create_admin_user() {
+    show_banner
+    verify_root
+
+    echo -e "\n${BOLD}${CYAN}================================================================${NC}"
+    echo -e "${BOLD}${CYAN}          CREATE / RESET OBSIDIAN ADMIN USER                    ${NC}"
+    echo -e "${BOLD}${CYAN}================================================================${NC}\n"
+
+    PANEL_DIR="/var/www/obsidian"
+    if [ ! -d "$PANEL_DIR" ]; then
+        echo -e "${RED}[ERROR] Obsidian Panel directory not found at $PANEL_DIR.${NC}"
+        echo -e "Please install the panel first."
+        return 1
+    fi
+
+    cd "$PANEL_DIR"
+
+    while true; do
+        read_input "Admin Username: " ADMIN_USERNAME
+        ADMIN_USERNAME=$(echo "$ADMIN_USERNAME" | tr -d ' ')
+        if [ -n "$ADMIN_USERNAME" ]; then
+            break
+        fi
+        echo -e "${RED}Username cannot be empty.${NC}"
+    done
+
+    while true; do
+        read_input "Admin Email: " ADMIN_EMAIL
+        ADMIN_EMAIL=$(echo "$ADMIN_EMAIL" | tr -d ' ')
+        if [ -n "$ADMIN_EMAIL" ]; then
+            break
+        fi
+        echo -e "${RED}Email cannot be empty.${NC}"
+    done
+
+    while true; do
+        read_secret "Admin Password (min 8 chars): " ADMIN_PASSWORD
+        if [ ${#ADMIN_PASSWORD} -ge 8 ]; then
+            break
+        fi
+        echo -e "${RED}Password must be at least 8 characters long.${NC}"
+    done
+
+    echo -e "\n${GREEN}[*] Registering administrator credentials...${NC}"
+    pnpm --filter @obsidian/api run bootstrap -- --username "${ADMIN_USERNAME}" --email "${ADMIN_EMAIL}" --password "${ADMIN_PASSWORD}"
+
+    echo -e "\n${GREEN}${BOLD}================================================================${NC}"
+    echo -e "${GREEN}${BOLD}          ADMINISTRATOR ACCOUNT READY                           ${NC}"
+    echo -e "${GREEN}${BOLD}================================================================${NC}\n"
+    echo -e "Username: ${BOLD}${ADMIN_USERNAME}${NC}"
+    echo -e "Email:    ${BOLD}${ADMIN_EMAIL}${NC}\n"
 }
 
 # ------------------------------------------------------------------------------
@@ -871,8 +994,9 @@ show_menu() {
         echo -e "  ${RED}[2]${NC} Delete / Uninstall Obsidian Panel"
         echo -e "  ${CYAN}[3]${NC} Install Pterodactyl Wings (Daemon)"
         echo -e "  ${RED}[4]${NC} Delete / Uninstall Pterodactyl Wings"
+        echo -e "  ${GREEN}[5]${NC} Create / Reset Admin User"
         echo -e "  ${YELLOW}[0]${NC} Exit\n"
-        read -p "Select option [0-4]: " ACTION
+        read_input "Select option [0-5]: " ACTION
 
         case "$ACTION" in
             1)
@@ -891,19 +1015,23 @@ show_menu() {
                 delete_wings
                 break
                 ;;
+            5)
+                create_admin_user
+                break
+                ;;
             0|q|Q|exit)
                 echo -e "\n${CYAN}Exiting installer. Goodbye!${NC}\n"
                 exit 0
                 ;;
             *)
-                echo -e "\n${RED}Invalid option '${ACTION}'. Please select 0, 1, 2, 3, or 4.${NC}"
+                echo -e "\n${RED}Invalid option '${ACTION}'. Please select 0, 1, 2, 3, 4, or 5.${NC}"
                 sleep 2
                 ;;
         esac
     done
 }
 
-# Parse CLI arguments if provided directly
+# Direct invocation dispatcher (runs menu by default without flags)
 case "$1" in
     --install-panel|-ip|--panel|-p)
         install_panel
@@ -917,16 +1045,20 @@ case "$1" in
     --delete-wings|-dw|--uninstall-wings)
         delete_wings
         ;;
+    --create-user|-cu|--user|-u)
+        create_admin_user
+        ;;
     --help|-h)
         show_banner
-        echo -e "Usage: bash install.sh [OPTION]\n"
+        echo -e "Usage: sudo bash install.sh [OPTION]\n"
         echo -e "Options:"
         echo -e "  --install-panel, -ip, -p    Run Obsidian Panel automated installer"
         echo -e "  --delete-panel, -dp         Uninstall / completely delete Obsidian Panel"
         echo -e "  --install-wings, -iw, -w    Install official Pterodactyl Wings daemon & Docker"
         echo -e "  --delete-wings, -dw         Uninstall / completely delete Pterodactyl Wings"
+        echo -e "  --create-user, -cu, -u      Create / Reset master administrator account"
         echo -e "  --help, -h                  Display this help message"
-        echo -e "\nIf no option is provided, an interactive menu will be launched.\n"
+        echo -e "\nIf no option is provided, the interactive menu is launched automatically.\n"
         exit 0
         ;;
     *)

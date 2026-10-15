@@ -14,20 +14,22 @@ cd /var/www/obsidian
 bash install.sh
 ```
 
-Or via one-line curl:
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/obsidian-panel/panel/main/install.sh)
+# Run the installer directly (No flags needed!)
+sudo bash <(curl -sSL https://raw.githubusercontent.com/obsidian-ontop/obsiden-panel/refs/heads/main/install.sh)
 ```
 
-The installer provides an interactive menu as well as direct command-line flags:
+Running the command presents an interactive menu:
+```text
+  [1] Install Obsidian Panel
+  [2] Delete / Uninstall Obsidian Panel
+  [3] Install Pterodactyl Wings (Daemon)
+  [4] Delete / Uninstall Pterodactyl Wings
+  [5] Create / Reset Admin User
+  [0] Exit
+```
 
-### Interactive Menu
-Running `bash install.sh` presents an interactive menu:
-- `[1] Install Obsidian Panel`
-- `[2] Delete / Uninstall Obsidian Panel`
-- `[3] Install Pterodactyl Wings (Daemon)`
-- `[4] Delete / Uninstall Pterodactyl Wings`
-- `[0] Exit`
+> **Note:** When selecting **[1] Install Obsidian Panel**, the installer prompts you to create your **Administrator account (Username, Email, Password) first**, along with your domain and SSL settings. Once entered, the entire installation and build process runs completely automated and unattended!
 
 ### Command-Line Arguments
 You can also invoke tasks directly:
