@@ -16,6 +16,7 @@ import {
   Folder,
   Radio,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
@@ -47,10 +48,11 @@ export default function ServersPage() {
   const { user } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
+  const [showAllServers, setShowAllServers] = useState(false);
 
   const { data: servers, isLoading, error } = useQuery<ServerSummary[]>({
-    queryKey: ['client-servers'],
-    queryFn: () => fetchApi('/api/client/servers'),
+    queryKey: ['client-servers', showAllServers],
+    queryFn: () => fetchApi(`/api/client/servers${showAllServers ? '?all=true' : ''}`),
     refetchInterval: 10000,
   });
 
@@ -88,6 +90,22 @@ export default function ServersPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Admin Toggle: Show All Servers vs My Servers */}
+          {user?.isAdmin && (
+            <button
+              onClick={() => setShowAllServers(!showAllServers)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-medium border transition-all ${
+                showAllServers
+                  ? 'bg-primary/20 border-primary text-primary shadow-sm'
+                  : 'bg-surface border-border text-text-muted hover:text-text-primary'
+              }`}
+              title="Admin server view filter"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>{showAllServers ? 'Showing: All Servers' : 'Showing: My Servers'}</span>
+            </button>
+          )}
+
           {/* Grid / List View Toggle */}
           <div className="flex items-center bg-surface border border-border rounded-control p-0.5">
             <button

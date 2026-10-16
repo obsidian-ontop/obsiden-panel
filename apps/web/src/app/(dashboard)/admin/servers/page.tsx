@@ -385,6 +385,68 @@ export default function AdminServersPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Minecraft Version Quick Selection */}
+                {eggDetails?.variables?.some((v: any) =>
+                  ['MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION'].includes(v.envVariable)
+                ) && (
+                  <div className="pt-2 border-t border-border">
+                    <label className="text-text-secondary font-medium block mb-1">
+                      Minecraft Version *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={
+                          ['latest', '1.21.1', '1.21', '1.20.6', '1.20.4', '1.20.2', '1.20.1', '1.19.4', '1.18.2', '1.16.5', '1.12.2'].includes(
+                            environment['MINECRAFT_VERSION'] || environment['MC_VERSION'] || environment['VANILLA_VERSION'] || ''
+                          )
+                            ? (environment['MINECRAFT_VERSION'] || environment['MC_VERSION'] || environment['VANILLA_VERSION'] || 'latest')
+                            : 'custom'
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== 'custom') {
+                            setEnvironment({
+                              ...environment,
+                              MINECRAFT_VERSION: val,
+                              MC_VERSION: val,
+                              VANILLA_VERSION: val,
+                            });
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-surface-elevated border border-border rounded-control text-text-primary focus:outline-none focus:border-primary font-mono text-xs"
+                      >
+                        <option value="latest">Latest Release (latest)</option>
+                        <option value="1.21.1">1.21.1 (Java 21)</option>
+                        <option value="1.21">1.21 (Java 21)</option>
+                        <option value="1.20.6">1.20.6 (Java 21)</option>
+                        <option value="1.20.4">1.20.4 (Java 17)</option>
+                        <option value="1.20.2">1.20.2 (Java 17)</option>
+                        <option value="1.20.1">1.20.1 (Java 17)</option>
+                        <option value="1.19.4">1.19.4 (Java 17)</option>
+                        <option value="1.18.2">1.18.2 (Java 17)</option>
+                        <option value="1.16.5">1.16.5 (Java 11 / 8)</option>
+                        <option value="1.12.2">1.12.2 (Java 8)</option>
+                        <option value="custom">Custom Version...</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={environment['MINECRAFT_VERSION'] || environment['MC_VERSION'] || environment['VANILLA_VERSION'] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEnvironment({
+                            ...environment,
+                            MINECRAFT_VERSION: val,
+                            MC_VERSION: val,
+                            VANILLA_VERSION: val,
+                          });
+                        }}
+                        placeholder="e.g. 1.20.4"
+                        className="w-32 px-3 py-2 bg-surface-elevated border border-border rounded-control text-text-primary focus:outline-none focus:border-primary font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

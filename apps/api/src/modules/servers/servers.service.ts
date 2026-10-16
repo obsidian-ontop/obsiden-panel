@@ -292,6 +292,42 @@ export class ServersService {
     return { success: true };
   }
 
+  async updateServerVariables(uuid: string, variables: Record<string, string>) {
+    const server = await this.getServerByUuid(uuid);
+
+    for (const [key, value] of Object.entries(variables)) {
+      const eggVar = server.egg.variables.find((v) => v.envVariable === key);
+      if (!eggVar) continue;
+
+      const existing = server.variables.find((v) => v.variableId === eggVar.id);
+      if (existing) {
+        await this.prisma.serverVariable.update({
+          where: { id: existing.id },
+          data: { variableValue: String(value) },
+        });
+      } else {
+        await this.prisma.serverVariable.create({
+          data: {
+            serverId: server.id,
+            variableId: eggVar.id,
+            variableValue: String(value),
+          },
+        });
+      }
+    }
+
+    // Tell Wings to sync the updated configuration
+    try {
+      const client = this.getWingsClient(server.node);
+      await client.syncServer(server.uuid);
+      this.logger.log(`Server ${server.uuid} configuration synced to Wings after variable update`);
+    } catch (err: any) {
+      this.logger.warn(`Could not sync updated variables to Wings: ${err.message}`);
+    }
+
+    return this.getServerByUuid(uuid);
+  }
+
   async reinstallServer(uuid: string) {
     const server = await this.getServerByUuid(uuid);
     const client = this.getWingsClient(server.node);

@@ -26,10 +26,11 @@ export class ClientServersController {
 
   @Get()
   @ApiOperation({ summary: 'List servers accessible to current user' })
-  async listServers(@Req() req: any) {
-    // Client-facing servers page only returns servers owned by or shared with current user.
-    // Full global server management for admins is segregated under /api/admin/servers.
-    return this.serversService.listClientServers(req.user.id, false);
+  async listServers(@Req() req: any, @Query('all') all?: string) {
+    // Regular customer or default client view: only servers owned by user or shared with user.
+    // Admins can toggle viewing all servers with ?all=true.
+    const showAll = Boolean(req.user?.isAdmin && all === 'true');
+    return this.serversService.listClientServers(req.user.id, showAll);
   }
 
   @Get(':uuid')
@@ -37,6 +38,17 @@ export class ClientServersController {
   @ApiOperation({ summary: 'Get details for a specific server' })
   async getServer(@Param('uuid') uuid: string) {
     return this.serversService.getServerByUuid(uuid);
+  }
+
+  @Patch(':uuid/variables')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.STARTUP_UPDATE)
+  @ApiOperation({ summary: 'Update server environment variables and sync to Wings' })
+  async updateServerVariables(
+    @Param('uuid') uuid: string,
+    @Body() body: { variables: Record<string, string> },
+  ) {
+    return this.serversService.updateServerVariables(uuid, body.variables);
   }
 
   @Get(':uuid/ws')
