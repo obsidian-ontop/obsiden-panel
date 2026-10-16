@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -42,14 +42,22 @@ export default function ServerLayout({
     refetchInterval: 10000,
   });
 
+  const [powerFeedback, setPowerFeedback] = useState<string | null>(null);
+
   const powerMutation = useMutation({
     mutationFn: (action: 'start' | 'stop' | 'restart' | 'kill') =>
       fetchApi(`/api/client/servers/${uuid}/power`, {
         method: 'POST',
         body: JSON.stringify({ action }),
       }),
-    onSuccess: () => {
+    onSuccess: (_, action) => {
+      setPowerFeedback(`Power action '${action}' dispatched`);
+      setTimeout(() => setPowerFeedback(null), 4000);
       queryClient.invalidateQueries({ queryKey: ['server', uuid] });
+    },
+    onError: (err: any) => {
+      setPowerFeedback(`Failed: ${err.message || 'Action error'}`);
+      setTimeout(() => setPowerFeedback(null), 6000);
     },
   });
 
@@ -115,8 +123,20 @@ export default function ServerLayout({
           </div>
 
           {/* Real-Time Power Controls */}
-          <div className="flex items-center gap-2">
-            <Button
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {powerFeedback && (
+              <span
+                className={`text-xs px-2.5 py-1 rounded border font-mono animate-fade-in ${
+                  powerFeedback.startsWith('Failed')
+                    ? 'bg-status-stopping/10 border-status-stopping/30 text-status-stopping'
+                    : 'bg-primary/10 border-primary/30 text-primary'
+                }`}
+              >
+                {powerFeedback}
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
               variant="secondary"
               size="sm"
               disabled={powerMutation.isPending}
@@ -155,6 +175,7 @@ export default function ServerLayout({
             >
               <Power className="w-3.5 h-3.5" /> Kill
             </Button>
+            </div>
           </div>
         </div>
 

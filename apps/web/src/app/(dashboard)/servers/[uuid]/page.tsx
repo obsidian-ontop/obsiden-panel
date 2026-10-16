@@ -3,9 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchApi } from '../../../../lib/api';
-import { Terminal as XTerm } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
 import {
   Cpu,
   Activity,
@@ -33,8 +30,8 @@ export default function ServerConsolePage({
 }) {
   const uuid = params.uuid;
   const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermInstance = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const xtermInstance = useRef<any>(null);
+  const fitAddonRef = useRef<any>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const [command, setCommand] = useState('');
@@ -58,49 +55,64 @@ export default function ServerConsolePage({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Initialize xterm.js
+  // Initialize xterm.js dynamically in browser only (prevents SSR "self is not defined")
   useEffect(() => {
     if (!terminalRef.current) return;
+    let isDisposed = false;
+    let term: any = null;
+    let fitAddon: any = null;
+    let handleResize: any = null;
 
-    const term = new XTerm({
-      cursorBlink: true,
-      cursorStyle: 'underline',
-      fontFamily: 'JetBrains Mono, Menlo, monospace',
-      fontSize: 12,
-      lineHeight: 1.25,
-      theme: {
-        background: '#090909',
-        foreground: '#F4F4F5',
-        cursor: '#06B6D4',
-        selectionBackground: '#272727',
-        black: '#181818',
-        red: '#EF4444',
-        green: '#10B981',
-        yellow: '#F59E0B',
-        blue: '#3B82F6',
-        magenta: '#8B5CF6',
-        cyan: '#06B6D4',
-        white: '#F4F4F5',
-      },
-      convertEol: true,
+    Promise.all([
+      import('@xterm/xterm'),
+      import('@xterm/addon-fit'),
+      import('@xterm/xterm/css/xterm.css' as any),
+    ]).then(([{ Terminal: XTerm }, { FitAddon }]) => {
+      if (isDisposed || !terminalRef.current) return;
+
+      term = new XTerm({
+        cursorBlink: true,
+        cursorStyle: 'underline',
+        fontFamily: 'JetBrains Mono, Menlo, monospace',
+        fontSize: 12,
+        lineHeight: 1.25,
+        theme: {
+          background: '#090909',
+          foreground: '#F4F4F5',
+          cursor: '#06B6D4',
+          selectionBackground: '#272727',
+          black: '#181818',
+          red: '#EF4444',
+          green: '#10B981',
+          yellow: '#F59E0B',
+          blue: '#3B82F6',
+          magenta: '#8B5CF6',
+          cyan: '#06B6D4',
+          white: '#F4F4F5',
+        },
+        convertEol: true,
+      });
+
+      fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(terminalRef.current);
+      fitAddon.fit();
+
+      xtermInstance.current = term;
+      fitAddonRef.current = fitAddon;
+
+      term.writeln('\x1b[36m[Obsidian Console] Initializing connection to Wings node...\x1b[0m');
+
+      handleResize = () => fitAddon.fit();
+      window.addEventListener('resize', handleResize);
+    }).catch((err) => {
+      console.error('Failed to load xterm:', err);
     });
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalRef.current);
-    fitAddon.fit();
-
-    xtermInstance.current = term;
-    fitAddonRef.current = fitAddon;
-
-    term.writeln('\x1b[36m[Obsidian Console] Initializing connection to Wings node...\x1b[0m');
-
-    const handleResize = () => fitAddon.fit();
-    window.addEventListener('resize', handleResize);
-
     return () => {
-      window.removeEventListener('resize', handleResize);
-      term.dispose();
+      isDisposed = true;
+      if (handleResize) window.removeEventListener('resize', handleResize);
+      if (term) term.dispose();
     };
   }, []);
 
@@ -111,64 +123,84 @@ export default function ServerConsolePage({
     const { socket, token } = wsCreds.data;
     setConnectionStatus('connecting');
 
-    const ws = new WebSocket(socket);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(socket);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setConnectionStatus('connected');
-      xtermInstance.current?.writeln('\x1b[32m[Obsidian Console] Connected to Wings daemon. Authenticating...\x1b[0m');
-      // Send authentication payload expected by Wings
-      ws.send(JSON.stringify({ event: 'auth', args: [token] }));
-    };
+      ws.onopen = () => {
+        setConnectionStatus('connected');
+        xtermInstance.current?.writeln('\x1b[32m[Obsidian Console] Connected to Wings daemon. Authenticating...\x1b[0m');
+        // Send authentication payload expected by Wings
+        ws.send(JSON.stringify({ event: 'auth', args: [token] }));
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        switch (payload.event) {
-          case 'auth success':
-            xtermInstance.current?.writeln('\x1b[32m[Obsidian Console] Authenticated successfully.\x1b[0m\r\n');
-            // Request scrollback logs
-            ws.send(JSON.stringify({ event: 'send logs', args: [null] }));
-            break;
-          case 'console output':
-            xtermInstance.current?.write(payload.args?.[0] || '');
-            break;
-          case 'stats':
-            if (payload.args?.[0]) {
-              try {
-                const parsed = JSON.parse(payload.args[0]);
-                setMetrics(parsed);
-              } catch {}
-            }
-            break;
-          case 'status':
-            xtermInstance.current?.writeln(`\r\n\x1b[33m[Obsidian Console] Server state changed to: ${payload.args?.[0]}\x1b[0m`);
-            break;
-          case 'daemon message':
-            xtermInstance.current?.writeln(`\r\n\x1b[36m[Wings Daemon] ${payload.args?.[0]}\x1b[0m`);
-            break;
-          case 'token expiring':
-            // Token renewal request could be dispatched here
-            break;
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          switch (payload.event) {
+            case 'auth success':
+              xtermInstance.current?.writeln('\x1b[32m[Obsidian Console] Authenticated successfully.\x1b[0m\r\n');
+              // Request scrollback logs and initial stats stream
+              ws.send(JSON.stringify({ event: 'send logs', args: [null] }));
+              ws.send(JSON.stringify({ event: 'send stats', args: [null] }));
+              break;
+            case 'jwt error':
+              xtermInstance.current?.writeln(`\r\n\x1b[31m[Wings Auth Error] ${payload.args?.[0] || 'Authentication rejected'}\x1b[0m`);
+              break;
+            case 'console output':
+              xtermInstance.current?.write(payload.args?.[0] || '');
+              break;
+            case 'install output':
+              xtermInstance.current?.write(payload.args?.[0] || '');
+              break;
+            case 'install started':
+              xtermInstance.current?.writeln('\r\n\x1b[33m[Obsidian Console] Server installation script started...\x1b[0m');
+              break;
+            case 'install completed':
+              xtermInstance.current?.writeln('\r\n\x1b[32m[Obsidian Console] Server installation completed successfully! You can now start the server.\x1b[0m');
+              break;
+            case 'stats':
+              if (payload.args?.[0]) {
+                try {
+                  const parsed = JSON.parse(payload.args[0]);
+                  setMetrics(parsed);
+                } catch {}
+              }
+              break;
+            case 'status':
+              xtermInstance.current?.writeln(`\r\n\x1b[33m[Obsidian Console] Server state: ${payload.args?.[0]}\x1b[0m`);
+              break;
+            case 'daemon message':
+              xtermInstance.current?.writeln(`\r\n\x1b[36m[Wings Daemon] ${payload.args?.[0]}\x1b[0m`);
+              break;
+            case 'daemon error':
+              xtermInstance.current?.writeln(`\r\n\x1b[31m[Wings Daemon Error] ${payload.args?.[0]}\x1b[0m`);
+              break;
+            case 'token expiring':
+              break;
+          }
+        } catch {
+          xtermInstance.current?.write(event.data);
         }
-      } catch {
-        xtermInstance.current?.write(event.data);
-      }
-    };
+      };
 
-    ws.onerror = () => {
+      ws.onerror = () => {
+        setConnectionStatus('error');
+        xtermInstance.current?.writeln('\r\n\x1b[31m[Obsidian Console] WebSocket error. Verify node connectivity & SSL certificates.\x1b[0m');
+      };
+
+      ws.onclose = () => {
+        setConnectionStatus('disconnected');
+        xtermInstance.current?.writeln('\r\n\x1b[33m[Obsidian Console] Connection closed.\x1b[0m');
+      };
+
+      return () => {
+        ws.close();
+      };
+    } catch (err: any) {
       setConnectionStatus('error');
-      xtermInstance.current?.writeln('\r\n\x1b[31m[Obsidian Console] WebSocket error. Verify node connectivity & SSL certificates.\x1b[0m');
-    };
-
-    ws.onclose = () => {
-      setConnectionStatus('disconnected');
-      xtermInstance.current?.writeln('\r\n\x1b[33m[Obsidian Console] Connection closed.\x1b[0m');
-    };
-
-    return () => {
-      ws.close();
-    };
+      xtermInstance.current?.writeln(`\r\n\x1b[31m[Obsidian Console] Failed to open WebSocket: ${err.message}\x1b[0m`);
+    }
   }, [wsCreds]);
 
   const handleSendCommand = (e: React.FormEvent) => {

@@ -57,11 +57,11 @@ export default function ServerSettingsPage({
 
   const reinstallMutation = useMutation({
     mutationFn: () =>
-      fetchApi(`/api/admin/servers/${uuid}/reinstall`, {
+      fetchApi(`/api/client/servers/${uuid}/reinstall`, {
         method: 'POST',
       }),
     onSuccess: () => {
-      alert('Reinstallation initiated on Wings daemon.');
+      alert('Reinstallation initiated on Wings daemon! Server files are being downloaded.');
       router.push(`/servers/${uuid}`);
     },
     onError: (err: any) => {

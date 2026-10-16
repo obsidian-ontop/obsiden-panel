@@ -200,11 +200,67 @@ export class WingsRemoteService {
     entrypoint: string;
     script: string;
   } {
+    const container_image =
+      egg.scriptContainer && egg.scriptContainer.trim() !== ''
+        ? egg.scriptContainer
+        : 'ghcr.io/pterodactyl/installers:alpine';
+    const entrypoint =
+      egg.scriptEntry && egg.scriptEntry.trim() !== '' ? egg.scriptEntry : 'ash';
+    const script =
+      egg.scriptInstall && egg.scriptInstall.trim() !== ''
+        ? egg.scriptInstall
+        : this.getDefaultInstallScript(egg.name);
+
     return {
-      container_image: egg.scriptContainer,
-      entrypoint: egg.scriptEntry,
-      script: egg.scriptInstall ?? '#!/bin/bash\necho "No install script provided."',
+      container_image,
+      entrypoint,
+      script,
     };
+  }
+
+  private getDefaultInstallScript(eggName: string): string {
+    return `#!/bin/ash
+# Obsidian Panel Default Installer
+cd /mnt/server
+
+if [ -z "\${SERVER_JARFILE}" ]; then
+    SERVER_JARFILE="paper.jar"
+fi
+
+echo "Installing Minecraft server files..."
+apk update && apk add --no-cache curl jq
+
+if echo "${eggName}" | grep -iq "paper"; then
+    if [ -z "\${MINECRAFT_VERSION}" ] || [ "\${MINECRAFT_VERSION}" = "latest" ]; then
+        MINECRAFT_VERSION=$(curl -sSL https://api.papermc.io/v2/projects/paper | jq -r '.versions[-1]')
+    fi
+    if [ -z "\${BUILD_NUMBER}" ] || [ "\${BUILD_NUMBER}" = "latest" ]; then
+        BUILD_NUMBER=$(curl -sSL https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION} | jq -r '.builds[-1]')
+    fi
+    echo "Downloading Paper \${MINECRAFT_VERSION} build \${BUILD_NUMBER}..."
+    DOWNLOAD_URL="https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}/downloads/paper-\${MINECRAFT_VERSION}-\${BUILD_NUMBER}.jar"
+    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+elif echo "${eggName}" | grep -iq "vanilla"; then
+    MANIFEST_URL="https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
+    if [ -z "\${VANILLA_VERSION}" ] || [ "\${VANILLA_VERSION}" = "latest" ]; then
+        VANILLA_VERSION=$(curl -sSL \${MANIFEST_URL} | jq -r '.latest.release')
+    fi
+    VERSION_URL=$(curl -sSL \${MANIFEST_URL} | jq -r --arg ver "\${VANILLA_VERSION}" '.versions[] | select(.id == \$ver) | .url')
+    DOWNLOAD_URL=$(curl -sSL \${VERSION_URL} | jq -r '.downloads.server.url')
+    echo "Downloading Vanilla \${VANILLA_VERSION}..."
+    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+else
+    # Default fallback to latest Paper
+    MINECRAFT_VERSION=$(curl -sSL https://api.papermc.io/v2/projects/paper | jq -r '.versions[-1]')
+    BUILD_NUMBER=$(curl -sSL https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION} | jq -r '.builds[-1]')
+    echo "Downloading Paper \${MINECRAFT_VERSION} build \${BUILD_NUMBER}..."
+    DOWNLOAD_URL="https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}/downloads/paper-\${MINECRAFT_VERSION}-\${BUILD_NUMBER}.jar"
+    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+fi
+
+echo "eula=true" > eula.txt
+echo "Installation complete!"
+`;
   }
 
   /**

@@ -619,4 +619,183 @@ export class ServersService {
     await this.prisma.subuser.delete({ where: { id: subuserId } });
     return { success: true, message: 'Subuser removed' };
   }
+
+  // ─── Databases ─────────────────────────────────────────────────────
+
+  async listDatabases(uuid: string) {
+    const server = await this.getServerByUuid(uuid);
+    const databases = await this.prisma.serverDatabase.findMany({
+      where: { serverId: server.id },
+      include: {
+        databaseHost: {
+          select: { id: true, name: true, host: true, port: true },
+        },
+      },
+    });
+
+    return {
+      data: databases.map((db) => ({
+        id: db.id,
+        database: db.database,
+        username: db.username,
+        password: db.password,
+        remoteHost: db.remoteHost,
+        maxConnections: db.maxConnections,
+        host: {
+          name: db.databaseHost.name,
+          address: db.databaseHost.host,
+          port: db.databaseHost.port,
+        },
+        relationships: {
+          password: {
+            attributes: {
+              password: db.password,
+            },
+          },
+        },
+      })),
+      meta: {
+        current: databases.length,
+        limit: server.databaseLimit,
+      },
+    };
+  }
+
+  async createDatabase(uuid: string, databaseName: string, remote: string = '%') {
+    const server = await this.getServerByUuid(uuid);
+    if (server.databaseLimit > 0) {
+      const count = await this.prisma.serverDatabase.count({
+        where: { serverId: server.id },
+      });
+      if (count >= server.databaseLimit) {
+        throw new BadRequestException(`Database limit reached (${server.databaseLimit})`);
+      }
+    }
+
+    const host = await this.prisma.databaseHost.findFirst({
+      where: server.node.id ? { OR: [{ nodeId: server.node.id }, { nodeId: null }] } : undefined,
+    });
+
+    if (!host) {
+      throw new BadRequestException('No database host available on this node.');
+    }
+
+    const cleanDbName = `s${server.id}_${databaseName.replace(/[^a-zA-Z0-9_]/g, '')}`.substring(0, 48);
+    const cleanUsername = `u${server.id}_${crypto.randomBytes(4).toString('hex')}`;
+    const generatedPassword = crypto.randomBytes(16).toString('hex');
+
+    const newDb = await this.prisma.serverDatabase.create({
+      data: {
+        serverId: server.id,
+        databaseHostId: host.id,
+        database: cleanDbName,
+        username: cleanUsername,
+        password: generatedPassword,
+        remoteHost: remote || '%',
+      },
+      include: {
+        databaseHost: true,
+      },
+    });
+
+    return {
+      success: true,
+      database: newDb,
+    };
+  }
+
+  async deleteDatabase(uuid: string, databaseId: number) {
+    const server = await this.getServerByUuid(uuid);
+    const db = await this.prisma.serverDatabase.findFirst({
+      where: { id: databaseId, serverId: server.id },
+    });
+
+    if (!db) throw new NotFoundException('Database not found');
+
+    await this.prisma.serverDatabase.delete({
+      where: { id: db.id },
+    });
+
+    return { success: true, message: 'Database deleted' };
+  }
+
+  async rotateDatabasePassword(uuid: string, databaseId: number) {
+    const server = await this.getServerByUuid(uuid);
+    const db = await this.prisma.serverDatabase.findFirst({
+      where: { id: databaseId, serverId: server.id },
+    });
+
+    if (!db) throw new NotFoundException('Database not found');
+
+    const newPassword = crypto.randomBytes(16).toString('hex');
+    await this.prisma.serverDatabase.update({
+      where: { id: db.id },
+      data: { password: newPassword },
+    });
+
+    return { success: true, password: newPassword };
+  }
+
+  // ─── Schedules ─────────────────────────────────────────────────────
+
+  async listSchedules(uuid: string) {
+    const server = await this.getServerByUuid(uuid);
+    return this.prisma.schedule.findMany({
+      where: { serverId: server.id },
+      include: {
+        tasks: {
+          orderBy: { sequenceId: 'asc' },
+        },
+      },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  async createSchedule(
+    uuid: string,
+    dto: {
+      name: string;
+      cronMinute: string;
+      cronHour: string;
+      cronDayOfMonth: string;
+      cronMonth: string;
+      cronDayOfWeek: string;
+      isActive?: boolean;
+      onlyWhenOnline?: boolean;
+    },
+  ) {
+    const server = await this.getServerByUuid(uuid);
+    return this.prisma.schedule.create({
+      data: {
+        serverId: server.id,
+        name: dto.name.trim(),
+        cronMinute: dto.cronMinute || '*',
+        cronHour: dto.cronHour || '*',
+        cronDayOfMonth: dto.cronDayOfMonth || '*',
+        cronMonth: dto.cronMonth || '*',
+        cronDayOfWeek: dto.cronDayOfWeek || '*',
+        isActive: dto.isActive ?? true,
+        onlyWhenOnline: dto.onlyWhenOnline ?? true,
+      },
+      include: {
+        tasks: true,
+      },
+    });
+  }
+
+  async deleteSchedule(uuid: string, scheduleId: number) {
+    const server = await this.getServerByUuid(uuid);
+    const schedule = await this.prisma.schedule.findFirst({
+      where: { id: scheduleId, serverId: server.id },
+    });
+
+    if (!schedule) throw new NotFoundException('Schedule not found');
+
+    await this.prisma.schedule.delete({
+      where: { id: schedule.id },
+    });
+
+    return { success: true, message: 'Schedule deleted' };
+  }
 }
+

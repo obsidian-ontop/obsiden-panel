@@ -156,6 +156,7 @@ export class AuthService {
     const now = Math.floor(Date.now() / 1000);
 
     // Sign JWT with the node's daemon token directly via jsonwebtoken to avoid options.expiresIn collision
+    // Scopes array is strictly required by Wings v1.11+ (CVE-2026-54593 token scope validation)
     const token = jsonwebtoken.sign(
       {
         iss: panelUrl,
@@ -165,7 +166,21 @@ export class AuthService {
         nbf: now,
         exp: now + 600, // 10 minutes
         server_uuid: serverUuid,
-        permissions: permissions.includes('*') ? ['*'] : permissions,
+        scopes: ['websocket'],
+        permissions: permissions.includes('*')
+          ? [
+              'websocket.connect',
+              'control.console',
+              'control.start',
+              'control.stop',
+              'control.restart',
+              'admin.websocket.errors',
+              'admin.websocket.install',
+              'admin.websocket.transfer',
+              'backup.read',
+              '*',
+            ]
+          : Array.from(new Set(['websocket.connect', ...permissions])),
         user_uuid: userUuid,
         user_id: userId,
         unique_id: uniqueId,

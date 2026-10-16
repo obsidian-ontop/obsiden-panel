@@ -225,4 +225,100 @@ export class ClientServersController {
   ) {
     return this.serversService.deleteSubuser(uuid, subuserId);
   }
+
+  // ─── Reinstall ─────────────────────────────────────────────────────
+
+  @Post(':uuid/reinstall')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.SETTINGS_REINSTALL)
+  @ApiOperation({ summary: 'Reinstall server software and files' })
+  async reinstallServer(@Param('uuid') uuid: string) {
+    return this.serversService.reinstallServer(uuid);
+  }
+
+  // ─── Databases ─────────────────────────────────────────────────────
+
+  @Get(':uuid/databases')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.DATABASE_READ)
+  @ApiOperation({ summary: 'List server databases' })
+  async listDatabases(@Param('uuid') uuid: string) {
+    return this.serversService.listDatabases(uuid);
+  }
+
+  @Post(':uuid/databases')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.DATABASE_CREATE)
+  @ApiOperation({ summary: 'Create a new database' })
+  async createDatabase(
+    @Param('uuid') uuid: string,
+    @Body() body: { database: string; remote?: string },
+  ) {
+    return this.serversService.createDatabase(uuid, body.database, body.remote);
+  }
+
+  @Delete(':uuid/databases/:databaseId')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.DATABASE_DELETE)
+  @ApiOperation({ summary: 'Delete a database' })
+  async deleteDatabase(
+    @Param('uuid') uuid: string,
+    @Param('databaseId', ParseIntPipe) databaseId: number,
+  ) {
+    return this.serversService.deleteDatabase(uuid, databaseId);
+  }
+
+  @Post(':uuid/databases/:databaseId/rotate-password')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.DATABASE_UPDATE)
+  @ApiOperation({ summary: 'Rotate database password' })
+  async rotateDatabasePassword(
+    @Param('uuid') uuid: string,
+    @Param('databaseId', ParseIntPipe) databaseId: number,
+  ) {
+    return this.serversService.rotateDatabasePassword(uuid, databaseId);
+  }
+
+  // ─── Schedules ─────────────────────────────────────────────────────
+
+  @Get(':uuid/schedules')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.SCHEDULE_READ)
+  @ApiOperation({ summary: 'List server schedules' })
+  async listSchedules(@Param('uuid') uuid: string) {
+    return this.serversService.listSchedules(uuid);
+  }
+
+  @Post(':uuid/schedules')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.SCHEDULE_CREATE)
+  @ApiOperation({ summary: 'Create a schedule' })
+  async createSchedule(
+    @Param('uuid') uuid: string,
+    @Body()
+    body: {
+      name: string;
+      cronMinute: string;
+      cronHour: string;
+      cronDayOfMonth: string;
+      cronMonth: string;
+      cronDayOfWeek: string;
+      isActive?: boolean;
+      onlyWhenOnline?: boolean;
+    },
+  ) {
+    return this.serversService.createSchedule(uuid, body);
+  }
+
+  @Delete(':uuid/schedules/:scheduleId')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.SCHEDULE_DELETE)
+  @ApiOperation({ summary: 'Delete a schedule' })
+  async deleteSchedule(
+    @Param('uuid') uuid: string,
+    @Param('scheduleId', ParseIntPipe) scheduleId: number,
+  ) {
+    return this.serversService.deleteSchedule(uuid, scheduleId);
+  }
 }
+
