@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Sidebar } from '../../components/layout/sidebar';
 import { Header } from '../../components/layout/header';
-import { CommandPalette } from '../../components/layout/command-palette';
 import { useAuth } from '../../contexts/auth-context';
 import { useRouter } from 'next/navigation';
 
@@ -14,7 +13,6 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
 
@@ -64,7 +62,7 @@ export default function DashboardLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 ml-64 flex flex-col min-h-screen bg-background">
-        <Header onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
+        <Header />
         <main className="flex-1 p-8 overflow-y-auto">
           {/* Unverified email warning banner */}
           {user && !user.emailVerifiedAt && !user.isAdmin && (
@@ -95,12 +93,6 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
-
-      {/* Global Cmd+K Command Palette */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-      />
     </div>
   );
 }

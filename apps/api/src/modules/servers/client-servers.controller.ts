@@ -27,7 +27,9 @@ export class ClientServersController {
   @Get()
   @ApiOperation({ summary: 'List servers accessible to current user' })
   async listServers(@Req() req: any) {
-    return this.serversService.listClientServers(req.user.id, req.user.isAdmin);
+    // Client-facing servers page only returns servers owned by or shared with current user.
+    // Full global server management for admins is segregated under /api/admin/servers.
+    return this.serversService.listClientServers(req.user.id, false);
   }
 
   @Get(':uuid')
