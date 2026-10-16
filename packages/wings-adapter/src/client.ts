@@ -155,9 +155,18 @@ export class WingsClient {
   // ─── Server Lifecycle ──────────────────────────────────────────────
 
   async createServer(payload: { uuid: string; start_on_completion?: boolean } | WingsServerConfiguration | any): Promise<void> {
-    const body = payload?.uuid
-      ? { uuid: payload.uuid, start_on_completion: Boolean(payload.start_on_completion) }
-      : { uuid: payload?.settings?.uuid, start_on_completion: false };
+    const rawUuid = payload?.uuid || payload?.settings?.uuid || '';
+    const uuid = String(rawUuid).trim().toLowerCase();
+    const start_on_completion = Boolean(payload?.start_on_completion);
+
+    if (!uuid) {
+      throw new WingsError('Cannot create server on Wings: server UUID is missing or empty');
+    }
+
+    const body = {
+      uuid,
+      start_on_completion,
+    };
     await this.executeRequest('/api/servers', 'POST', body);
   }
 

@@ -493,10 +493,9 @@ EOF
     fi
     cd "$INSTALL_DIR"
 
-    echo -e "${GREEN}[*] Building Next.js Web Frontend & NestJS Backend...${NC}"
+    echo -e "${GREEN}[*] Building Monorepo Packages, NestJS Backend & Next.js Frontend...${NC}"
     rm -f "$INSTALL_DIR/apps/api/tsconfig.tsbuildinfo" "$INSTALL_DIR/tsconfig.tsbuildinfo" 2>/dev/null || true
-    pnpm --filter @obsidian/api build
-    pnpm --filter @obsidian/web build
+    pnpm -r build
 
     if [ -f "$INSTALL_DIR/apps/web/node_modules/.bin/next" ]; then
         NEXT_BIN="$INSTALL_DIR/apps/web/node_modules/.bin/next"

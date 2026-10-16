@@ -249,12 +249,27 @@ export class ServersService {
       this.logger.log(`Server ${createdServer.uuid} successfully provisioned to Wings node ${node.name}`);
     } catch (err: any) {
       this.logger.error(`Failed to push server ${createdServer.uuid} to Wings: ${err.message}`);
-      await this.prisma.server.update({
-        where: { id: createdServer.id },
-        data: { status: 'install_failed' },
-      });
+      // Clean up database completely so rejected server is not saved or left dangling in panel
+      try {
+        await this.prisma.$transaction([
+          this.prisma.allocation.updateMany({
+            where: { serverId: createdServer.id },
+            data: { serverId: null },
+          }),
+          this.prisma.serverVariable.deleteMany({
+            where: { serverId: createdServer.id },
+          }),
+          this.prisma.server.delete({
+            where: { id: createdServer.id },
+          }),
+        ]);
+        this.logger.log(`Rolled back server ${createdServer.uuid} from database after Wings rejection`);
+      } catch (cleanupErr: any) {
+        this.logger.error(`Failed to clean up rejected server ${createdServer.uuid}: ${cleanupErr.message}`);
+      }
+
       throw new BadRequestException(
-        `Server recorded in database, but Wings daemon failed: ${err.message}`,
+        `Wings daemon rejected server creation: ${err.message}. Server was not created.`,
       );
     }
 
@@ -280,7 +295,24 @@ export class ServersService {
   async reinstallServer(uuid: string) {
     const server = await this.getServerByUuid(uuid);
     const client = this.getWingsClient(server.node);
-    await client.reinstallServer(server.uuid);
+
+    try {
+      await client.reinstallServer(server.uuid);
+    } catch (err: any) {
+      // If server does not exist on Wings daemon (HTTP 404), provision it from scratch
+      if (err.statusCode === 404 || err.message?.includes('404')) {
+        this.logger.warn(
+          `Server ${server.uuid} does not exist on Wings node ${server.node.name} (404). Re-provisioning server via createServer...`,
+        );
+        await client.createServer({
+          uuid: server.uuid,
+          start_on_completion: false,
+        });
+      } else {
+        throw err;
+      }
+    }
+
     await this.prisma.server.update({
       where: { id: server.id },
       data: { status: 'installing' },
