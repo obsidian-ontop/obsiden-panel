@@ -11,7 +11,14 @@ import {
   Settings,
   Users,
   X,
+  User as UserIcon,
+  Shield,
+  Key,
+  Activity,
+  LayoutDashboard,
+  Network,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/auth-context';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -21,6 +28,7 @@ interface CommandPaletteProps {
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,14 +47,28 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null;
 
-  const quickLinks = [
+  const userLinks = [
     { title: 'Servers List', path: '/servers', icon: Server, category: 'Servers' },
+    { title: 'Account Settings', path: '/account', icon: UserIcon, category: 'Account' },
+    { title: 'Security & 2FA', path: '/security', icon: Shield, category: 'Account' },
+    { title: 'API Keys', path: '/api-keys', icon: Key, category: 'Account' },
+    { title: 'Activity Logs', path: '/activity', icon: Activity, category: 'Account' },
+  ];
+
+  const adminLinks = [
+    { title: 'Admin Overview', path: '/admin', icon: LayoutDashboard, category: 'Admin' },
+    { title: 'All Servers (Admin)', path: '/admin/servers', icon: Server, category: 'Admin' },
     { title: 'Nodes Management', path: '/admin/nodes', icon: HardDrive, category: 'Admin' },
     { title: 'Locations', path: '/admin/locations', icon: MapPin, category: 'Admin' },
+    { title: 'Allocations', path: '/admin/allocations', icon: Network, category: 'Admin' },
     { title: 'Nests & Eggs', path: '/admin/nests', icon: Layers, category: 'Admin' },
     { title: 'User Accounts', path: '/admin/users', icon: Users, category: 'Admin' },
-    { title: 'System Settings', path: '/admin/settings', icon: Settings, category: 'Settings' },
+    { title: 'System Settings', path: '/admin/settings', icon: Settings, category: 'Admin' },
   ];
+
+  const quickLinks = user?.isAdmin
+    ? [...userLinks, ...adminLinks]
+    : userLinks;
 
   const filtered = quickLinks.filter(
     (item) =>
