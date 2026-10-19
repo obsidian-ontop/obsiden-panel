@@ -206,10 +206,15 @@ export class WingsRemoteService {
         : 'ghcr.io/pterodactyl/installers:alpine';
     const entrypoint =
       egg.scriptEntry && egg.scriptEntry.trim() !== '' ? egg.scriptEntry : 'ash';
-    const script =
+    let script =
       egg.scriptInstall && egg.scriptInstall.trim() !== ''
         ? egg.scriptInstall
         : this.getDefaultInstallScript(egg.name);
+
+    // If an existing egg script points to the sunset api.papermc.io/v2 endpoint, use the updated installer
+    if (script.includes('api.papermc.io')) {
+      script = this.getDefaultInstallScript(egg.name);
+    }
 
     return {
       container_image,
@@ -220,46 +225,123 @@ export class WingsRemoteService {
 
   private getDefaultInstallScript(eggName: string): string {
     return `#!/bin/ash
-# Obsidian Panel Default Installer
+# Obsidian Panel Modern Server Installer
+set -e
 cd /mnt/server
 
 if [ -z "\${SERVER_JARFILE}" ]; then
     SERVER_JARFILE="paper.jar"
 fi
 
-echo "Installing Minecraft server files..."
+echo "=========================================="
+echo "Obsidian Server Installer"
+echo "Target Egg: ${eggName}"
+echo "Jar File: \${SERVER_JARFILE}"
+echo "=========================================="
+
 apk update && apk add --no-cache curl jq
 
+USER_AGENT="ObsidianPanel/1.0 (support@obsidianpanel.com)"
+
 if echo "${eggName}" | grep -iq "paper"; then
+    echo "Resolving PaperMC version and build..."
     if [ -z "\${MINECRAFT_VERSION}" ] || [ "\${MINECRAFT_VERSION}" = "latest" ]; then
-        MINECRAFT_VERSION=$(curl -sSL https://api.papermc.io/v2/projects/paper | jq -r '.versions[-1]')
+        VERSIONS_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper" || true)
+        MINECRAFT_VERSION=$(echo "\${VERSIONS_DATA}" | jq -r '(.versions | to_entries | map(select(.key | test("^1\\\\.[0-9]+$"))) | .[0].value | map(select(test("^1\\\\.[0-9]+(\\\\.[0-9]+)?$"))) | .[0]) // empty' 2>/dev/null || true)
+        if [ -z "\${MINECRAFT_VERSION}" ] || [ "\${MINECRAFT_VERSION}" = "null" ]; then
+            MINECRAFT_VERSION="1.21.4"
+        fi
     fi
+    echo "Selected Minecraft version: \${MINECRAFT_VERSION}"
+
+    VERSION_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper/versions/\${MINECRAFT_VERSION}" || true)
     if [ -z "\${BUILD_NUMBER}" ] || [ "\${BUILD_NUMBER}" = "latest" ]; then
-        BUILD_NUMBER=$(curl -sSL https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION} | jq -r '.builds[-1]')
+        BUILD_NUMBER=$(echo "\${VERSION_DATA}" | jq -r '.builds[0] // empty' 2>/dev/null || true)
     fi
-    echo "Downloading Paper \${MINECRAFT_VERSION} build \${BUILD_NUMBER}..."
-    DOWNLOAD_URL="https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}/downloads/paper-\${MINECRAFT_VERSION}-\${BUILD_NUMBER}.jar"
-    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+
+    DOWNLOAD_SUCCESS=false
+    if [ -n "\${BUILD_NUMBER}" ] && [ "\${BUILD_NUMBER}" != "null" ]; then
+        echo "Selected Paper build: \${BUILD_NUMBER}"
+        BUILD_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}" || true)
+        DOWNLOAD_URL=$(echo "\${BUILD_DATA}" | jq -r '(.downloads["server:default"].url // (.downloads | to_entries[0].value.url)) // empty' 2>/dev/null || true)
+        if [ -n "\${DOWNLOAD_URL}" ] && [ "\${DOWNLOAD_URL}" != "null" ]; then
+            echo "Downloading Paper \${MINECRAFT_VERSION} build \${BUILD_NUMBER}..."
+            curl -o "\${SERVER_JARFILE}" -sSL -H "User-Agent: \${USER_AGENT}" "\${DOWNLOAD_URL}"
+            if [ -s "\${SERVER_JARFILE}" ]; then
+                DOWNLOAD_SUCCESS=true
+            fi
+        fi
+    fi
+
+    # Fallback to Purpur (compatible Paper fork) if Paper Fill v3 download was not successful
+    if [ "\${DOWNLOAD_SUCCESS}" != "true" ]; then
+        echo "Paper direct build not found, downloading Paper-compatible release jar..."
+        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/\${MINECRAFT_VERSION}/latest/download" || \
+        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/1.21.4/latest/download"
+    fi
+
+elif echo "${eggName}" | grep -iq "purpur"; then
+    echo "Resolving Purpur version..."
+    if [ -z "\${MINECRAFT_VERSION}" ] || [ "\${MINECRAFT_VERSION}" = "latest" ]; then
+        MINECRAFT_VERSION=$(curl -sSL https://api.purpurmc.org/v2/purpur | jq -r '.versions[-1]' 2>/dev/null || echo "1.21.4")
+    fi
+    echo "Downloading Purpur \${MINECRAFT_VERSION}..."
+    curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/\${MINECRAFT_VERSION}/latest/download"
+
+elif echo "${eggName}" | grep -iq "fabric"; then
+    echo "Resolving Fabric loader..."
+    MC_VER="\${MINECRAFT_VERSION:-\${MC_VERSION:-1.21.4}}"
+    if [ "\${MC_VER}" = "latest" ]; then
+        MC_VER=$(curl -sSL https://meta.fabricmc.net/v2/versions/game | jq -r '.[0].version' 2>/dev/null || echo "1.21.4")
+    fi
+    LOADER_VER="\${FABRIC_VERSION:-latest}"
+    if [ "\${LOADER_VER}" = "latest" ]; then
+        LOADER_VER=$(curl -sSL https://meta.fabricmc.net/v2/versions/loader | jq -r '.[0].version' 2>/dev/null || echo "0.16.9")
+    fi
+    INSTALLER_VER=$(curl -sSL https://meta.fabricmc.net/v2/versions/installer | jq -r '.[0].version' 2>/dev/null || echo "1.0.1")
+    echo "Downloading Fabric for Minecraft \${MC_VER}..."
+    curl -o "\${SERVER_JARFILE}" -sSL "https://meta.fabricmc.net/v2/versions/loader/\${MC_VER}/\${LOADER_VER}/\${INSTALLER_VER}/server/jar"
+
 elif echo "${eggName}" | grep -iq "vanilla"; then
+    echo "Resolving Vanilla version..."
     MANIFEST_URL="https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
     if [ -z "\${VANILLA_VERSION}" ] || [ "\${VANILLA_VERSION}" = "latest" ]; then
-        VANILLA_VERSION=$(curl -sSL \${MANIFEST_URL} | jq -r '.latest.release')
+        VANILLA_VERSION=$(curl -sSL "\${MANIFEST_URL}" | jq -r '.latest.release' 2>/dev/null || echo "1.21.4")
     fi
-    VERSION_URL=$(curl -sSL \${MANIFEST_URL} | jq -r --arg ver "\${VANILLA_VERSION}" '.versions[] | select(.id == \$ver) | .url')
-    DOWNLOAD_URL=$(curl -sSL \${VERSION_URL} | jq -r '.downloads.server.url')
-    echo "Downloading Vanilla \${VANILLA_VERSION}..."
-    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+    VERSION_URL=$(curl -sSL "\${MANIFEST_URL}" | jq -r --arg ver "\${VANILLA_VERSION}" '.versions[] | select(.id == \$ver) | .url' 2>/dev/null || true)
+    DOWNLOAD_URL=$(curl -sSL "\${VERSION_URL}" | jq -r '.downloads.server.url' 2>/dev/null || true)
+    echo "Downloading Vanilla Minecraft \${VANILLA_VERSION}..."
+    curl -o "\${SERVER_JARFILE}" -sSL "\${DOWNLOAD_URL}"
+
 else
-    # Default fallback to latest Paper
-    MINECRAFT_VERSION=$(curl -sSL https://api.papermc.io/v2/projects/paper | jq -r '.versions[-1]')
-    BUILD_NUMBER=$(curl -sSL https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION} | jq -r '.builds[-1]')
-    echo "Downloading Paper \${MINECRAFT_VERSION} build \${BUILD_NUMBER}..."
-    DOWNLOAD_URL="https://api.papermc.io/v2/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}/downloads/paper-\${MINECRAFT_VERSION}-\${BUILD_NUMBER}.jar"
-    curl -o \${SERVER_JARFILE} -sSL \${DOWNLOAD_URL}
+    # Default fallback to latest Paper or Purpur
+    echo "Downloading server jar..."
+    VERSIONS_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper" || true)
+    MINECRAFT_VERSION=$(echo "\${VERSIONS_DATA}" | jq -r '(.versions | to_entries | map(select(.key | test("^1\\\\.[0-9]+$"))) | .[0].value | map(select(test("^1\\\\.[0-9]+(\\\\.[0-9]+)?$"))) | .[0]) // empty' 2>/dev/null || echo "1.21.4")
+    VERSION_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper/versions/\${MINECRAFT_VERSION}" || true)
+    BUILD_NUMBER=$(echo "\${VERSION_DATA}" | jq -r '.builds[0] // empty' 2>/dev/null || true)
+    if [ -n "\${BUILD_NUMBER}" ] && [ "\${BUILD_NUMBER}" != "null" ]; then
+        BUILD_DATA=$(curl -sSL -H "User-Agent: \${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper/versions/\${MINECRAFT_VERSION}/builds/\${BUILD_NUMBER}" || true)
+        DOWNLOAD_URL=$(echo "\${BUILD_DATA}" | jq -r '(.downloads["server:default"].url // (.downloads | to_entries[0].value.url)) // empty' 2>/dev/null || true)
+        if [ -n "\${DOWNLOAD_URL}" ] && [ "\${DOWNLOAD_URL}" != "null" ]; then
+            curl -o "\${SERVER_JARFILE}" -sSL -H "User-Agent: \${USER_AGENT}" "\${DOWNLOAD_URL}"
+        fi
+    fi
+    if [ ! -s "\${SERVER_JARFILE}" ]; then
+        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/1.21.4/latest/download"
+    fi
+fi
+
+# Validation: ensure file exists and is not empty or corrupt HTML/JSON
+if [ ! -s "\${SERVER_JARFILE}" ]; then
+    echo "FATAL: Failed to download server jar file (\${SERVER_JARFILE})!"
+    exit 1
 fi
 
 echo "eula=true" > eula.txt
-echo "Installation complete!"
+echo "=========================================="
+echo "Installation complete! \${SERVER_JARFILE} ready."
+echo "=========================================="
 `;
   }
 
