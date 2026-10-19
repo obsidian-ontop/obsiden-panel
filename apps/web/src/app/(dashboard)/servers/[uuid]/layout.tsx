@@ -8,6 +8,7 @@ import { fetchApi } from '../../../../lib/api';
 import {
   Terminal,
   FolderOpen,
+  Layers,
   Database,
   Calendar,
   Archive,
@@ -64,6 +65,7 @@ export default function ServerLayout({
   const navTabs = [
     { label: 'Console', href: `/servers/${uuid}`, icon: Terminal },
     { label: 'Files', href: `/servers/${uuid}/files`, icon: FolderOpen },
+    { label: 'Versions', href: `/servers/${uuid}/versions`, icon: Layers },
     { label: 'Databases', href: `/servers/${uuid}/databases`, icon: Database },
     { label: 'Schedules', href: `/servers/${uuid}/schedules`, icon: Calendar },
     { label: 'Backups', href: `/servers/${uuid}/backups`, icon: Archive },

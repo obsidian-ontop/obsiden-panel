@@ -273,11 +273,15 @@ if echo "${eggName}" | grep -iq "paper"; then
         fi
     fi
 
-    # Fallback to Purpur (compatible Paper fork) if Paper Fill v3 download was not successful
-    if [ "\${DOWNLOAD_SUCCESS}" != "true" ]; then
-        echo "Paper direct build not found, downloading Paper-compatible release jar..."
-        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/\${MINECRAFT_VERSION}/latest/download" || \
-        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/1.21.4/latest/download"
+    # Verify download succeeded with minimum expected JAR file size (5MB+)
+    if [ ! -s "\${SERVER_JARFILE}" ] || [ $(wc -c < "\${SERVER_JARFILE}" 2>/dev/null || echo 0) -lt 5000000 ]; then
+        echo "Primary Paper download incomplete, trying direct stable Paper 1.21.4 build..."
+        curl -o "\${SERVER_JARFILE}" -sSL -H "User-Agent: \${USER_AGENT}" "https://fill-data.papermc.io/v1/objects/5ee4f542f628a14c644410b08c94ea42e772ef4d29fe92973636b6813d4eaffc/paper-1.21.4-232.jar" || true
+    fi
+
+    if [ ! -s "\${SERVER_JARFILE}" ] || [ $(wc -c < "\${SERVER_JARFILE}" 2>/dev/null || echo 0) -lt 5000000 ]; then
+        echo "Falling back to Purpur release jar..."
+        curl -o "\${SERVER_JARFILE}" -sSL "https://api.purpurmc.org/v2/purpur/1.21.4/latest/download" || true
     fi
 
 elif echo "${eggName}" | grep -iq "purpur"; then

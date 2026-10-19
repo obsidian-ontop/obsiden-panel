@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import { ServersService } from './servers.service';
+import { VersionsService } from './versions.service';
 import { SessionGuard } from '../auth/guards/session.guard';
 import { ServerAccessGuard, RequirePermissions } from './guards/server-access.guard';
 import { Permission } from '@obsidian/permissions';
@@ -22,7 +23,10 @@ import { Permission } from '@obsidian/permissions';
 @UseGuards(SessionGuard)
 @Controller('api/client/servers')
 export class ClientServersController {
-  constructor(private readonly serversService: ServersService) {}
+  constructor(
+    private readonly serversService: ServersService,
+    private readonly versionsService: VersionsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List servers accessible to current user' })
@@ -319,6 +323,30 @@ export class ClientServersController {
     @Param('scheduleId', ParseIntPipe) scheduleId: number,
   ) {
     return this.serversService.deleteSchedule(uuid, scheduleId);
+  }
+
+  // ─── Version Manager ────────────────────────────────────────────────
+  @Get(':uuid/versions')
+  @UseGuards(ServerAccessGuard)
+  @ApiOperation({ summary: 'List supported Minecraft server/proxy software and versions' })
+  async listVersions() {
+    return this.versionsService.getSoftwareCatalog();
+  }
+
+  @Post(':uuid/versions/install')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.STARTUP_UPDATE)
+  @ApiOperation({ summary: 'Download and install a specific software version on the server' })
+  async installVersion(
+    @Param('uuid') uuid: string,
+    @Body()
+    body: {
+      software: string;
+      version: string;
+      customJarName?: string;
+    },
+  ) {
+    return this.versionsService.installVersion(uuid, body);
   }
 }
 

@@ -261,6 +261,24 @@ export class WingsClient {
   }
 
   /**
+   * Pull/download a remote file into the server filesystem via Wings daemon.
+   */
+  async pullFile(
+    serverUuid: string,
+    url: string,
+    directory: string = '/',
+    fileName?: string,
+    foreground: boolean = true,
+  ): Promise<void> {
+    await this.executeRequest(`/api/servers/${serverUuid}/files/pull`, 'POST', {
+      root: directory,
+      url,
+      file_name: fileName,
+      foreground,
+    });
+  }
+
+  /**
    * Rename or move files.
    */
   async renameFiles(
