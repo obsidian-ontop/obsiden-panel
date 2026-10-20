@@ -31,49 +31,98 @@ interface ServerMetrics {
 }
 
 /**
- * Cleanly formats and colors raw console stream output so every message,
- * daemon log, container shell prompt, and error appears on its own line.
+ * Cleanly formats and colors raw console stream output:
+ * - Completely suppresses noisy Docker download/extract layer spam
+ * - Formats every daemon message, container prompt, and Minecraft log line onto its own clean line
+ * - Applies sleek terminal coloring (sky blue daemon tags, cyan INFO, amber WARN, red ERROR)
  */
 function formatConsoleLogs(chunk: string): string {
   if (!chunk) return '';
 
-  // 1. Separate squashed lines: insert line breaks before known log/daemon prefixes
-  let formatted = chunk
+  let formatted = chunk;
+
+  // 1. Completely strip Docker image layer download/extract progress spam
+  formatted = formatted.replace(
+    /(?:Downloading|Extracting)\s+\[[=>\s]+\]\s+[\d\.]+\s*(?:kB|MB|GB|B)\/[\d\.]+\s*(?:kB|MB|GB|B)/gi,
+    ''
+  );
+  formatted = formatted.replace(
+    /\b(?:Pulling fs layer|Download complete|Verifying Checksum|Pull complete|Waiting)\b\s*/gi,
+    ''
+  );
+  formatted = formatted.replace(/Pulling from [^\r\n]*/gi, '');
+
+  // If the chunk only contained stripped download progress noise, drop it completely
+  if (!formatted.replace(/[\r\n\s]/g, '')) {
+    return '';
+  }
+
+  // 2. Separate squashed lines: insert line breaks before known log/daemon prefixes
+  formatted = formatted
     // Ensure line break before [Pterodactyl Daemon]: or [Wings Daemon]:
-    .replace(/(?<!\r?\n)\[(Pterodactyl Daemon|Wings Daemon)\]:/g, '\r\n[$1]:')
-    // Ensure line break before container shell prompt (container@pterodactyl~)
-    .replace(/(?<!\r?\n)(container@[a-zA-Z0-9_\-]+~)/g, '\r\n$1')
+    .replace(/(?<!\r?\n)\[(Pterodactyl Daemon|Wings Daemon)\]:/gi, '\r\n[$1]:')
+    // Ensure line break before Minecraft standard timestamps: [15:43:57 INFO]: or [15:43:57.123 WARN]:
+    .replace(
+      /(?<!\r?\n)(\[\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?\s+(?:INFO|WARN|WARNING|ERROR|FATAL|DEBUG|TRACE)\]:?)/gi,
+      '\r\n$1'
+    )
+    // Ensure line break before Minecraft thread format: [15:43:57] [Server thread/INFO]:
+    .replace(
+      /(?<!\r?\n)(\[\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?\]\s+\[[^\]]+\]:?)/gi,
+      '\r\n$1'
+    )
+    // Ensure line break before container shell prompt (container@pterodactyl:~$ or container@pterodactyl~)
+    .replace(/(?<!\r?\n)(container@[a-zA-Z0-9_\-]+[:~])/gi, '\r\n$1')
     // Ensure line break before java version or openjdk info
-    .replace(/(?<!\r?\n)(openjdk version|OpenJDK Runtime|OpenJDK 64-Bit)/g, '\r\n$1')
+    .replace(/(?<!\r?\n)(openjdk version|OpenJDK Runtime|OpenJDK 64-Bit)/gi, '\r\n$1')
+    // Ensure line break before header banners like *** Warning ... ***
+    .replace(/(?<!\r?\n)(\*{3,}[^\*\r\n]+\*{3,})/g, '\r\n$1\r\n')
     // Ensure line break before server starting commands or main entry
-    .replace(/(?<!\r?\n)(Starting org\.bukkit|Starting minecraft)/g, '\r\n$1')
+    .replace(/(?<!\r?\n)(Starting org\.bukkit|Starting minecraft)/gi, '\r\n$1')
     // Ensure line break before Exception in thread
-    .replace(/(?<!\r?\n)(Exception in thread)/g, '\r\n$1')
+    .replace(/(?<!\r?\n)(Exception in thread)/gi, '\r\n$1')
     // Ensure line break before stack trace entries (at java.base, at org.bukkit, etc.)
-    .replace(/(?<!\r?\n)(\s*at (?:java\.base|org\.bukkit|io\.papermc|net\.minecraft))/g, '\r\n$1')
-    // Ensure line break before Docker image pull progress
-    .replace(/(?<!\r?\n)(Status: |Pulling from |Digest: )/g, '\r\n$1')
+    .replace(/(?<!\r?\n)(\s*at (?:java\.base|org\.bukkit|io\.papermc|net\.minecraft))/gi, '\r\n$1')
     // Ensure line break before crash/exit info
-    .replace(/(?<!\r?\n)(\[-+ Detected server process)/g, '\r\n$1')
-    .replace(/(?<!\r?\n)(\[Pterodactyl Daemon\]: Exit code:|\[Pterodactyl Daemon\]: Out of memory:)/g, '\r\n$1')
-    .replace(/(?<!\r?\n)(\[Pterodactyl Daemon\]: Aborting automatic restart)/g, '\r\n$1');
+    .replace(/(?<!\r?\n)(\[-+ Detected server process)/gi, '\r\n$1')
+    .replace(
+      /(?<!\r?\n)(\[Pterodactyl Daemon\]: (?:Exit code|Out of memory|Aborting automatic restart))/gi,
+      '\r\n$1'
+    );
 
-  // 2. Normalize standalone \n to \r\n for xterm.js
-  formatted = formatted.replace(/(?<!\r)\n/g, '\r\n');
+  // 3. Normalize all line breaks to \r\n (prevent staircasing in xterm.js)
+  formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
 
-  // 3. Highlight daemon tags with cool ANSI sky blue
+  // 4. Colorize Minecraft logs:
+  // [15:43:57 INFO]:
+  formatted = formatted.replace(
+    /\[(\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?)\s+(INFO)\]:/g,
+    '\x1b[38;2;100;116;139m[$1\x1b[0m \x1b[38;2;34;211;238m$2\x1b[38;2;100;116;139m]:\x1b[0m'
+  );
+  // [15:43:57 WARN]:
+  formatted = formatted.replace(
+    /\[(\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?)\s+(WARN|WARNING)\]:/g,
+    '\x1b[38;2;100;116;139m[$1\x1b[0m \x1b[38;2;251;191;36m$2\x1b[38;2;100;116;139m]:\x1b[0m'
+  );
+  // [15:43:57 ERROR]:
+  formatted = formatted.replace(
+    /\[(\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?)\s+(ERROR|FATAL)\]:/g,
+    '\x1b[38;2;100;116;139m[$1\x1b[0m \x1b[1;38;2;248;113;113m$2\x1b[38;2;100;116;139m]:\x1b[0m'
+  );
+
+  // 5. Highlight daemon tags with cool ANSI sky blue
   formatted = formatted.replace(
     /\[(Pterodactyl Daemon|Wings Daemon)\]:/g,
     '\x1b[38;2;56;189;248m[$1]:\x1b[0m'
   );
 
-  // 4. Style container shell prompt in neon emerald + violet
+  // 6. Style container shell prompt in neon emerald + violet
   formatted = formatted.replace(
-    /container@([a-zA-Z0-9_\-]+)~/g,
+    /container@([a-zA-Z0-9_\-]+)[:~](\$|~)?/g,
     '\x1b[38;2;52;211;153mcontainer@$1\x1b[0m:\x1b[38;2;168;85;247m~\x1b[0m$'
   );
 
-  // 5. Highlight fatal exceptions and version mismatch in vivid red
+  // 7. Highlight fatal exceptions and version mismatch in vivid red
   formatted = formatted.replace(
     /(UnsupportedClassVersionError[^\r\n]*)/g,
     '\x1b[1;38;2;248;113;113m$1\x1b[0m'
@@ -83,7 +132,7 @@ function formatConsoleLogs(chunk: string): string {
     '\x1b[1;31m$1\x1b[0m'
   );
 
-  // 6. Dim stack trace frames for clean readability
+  // 8. Dim stack trace frames for clean readability
   formatted = formatted.replace(
     /(\s+at [^\r\n]+)/g,
     '\x1b[38;2;148;163;184m$1\x1b[0m'
