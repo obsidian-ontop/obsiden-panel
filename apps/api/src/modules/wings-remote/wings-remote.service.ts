@@ -34,7 +34,7 @@ export class WingsRemoteService {
     process_configuration: Record<string, unknown>;
   } {
     const settings = this.buildServerSettings(server);
-    const processConfiguration = this.buildProcessConfiguration(server.egg);
+    const processConfiguration = this.buildProcessConfiguration(server.egg, server);
 
     return {
       settings,
@@ -131,7 +131,7 @@ export class WingsRemoteService {
   /**
    * Build the process_configuration matching Wings' ProcessConfiguration type.
    */
-  private buildProcessConfiguration(egg: Egg): Record<string, unknown> {
+  private buildProcessConfiguration(egg: Egg, server?: ServerWithRelations): Record<string, unknown> {
     // Parse config_startup from egg
     let startup = { done: [] as string[], user_interaction: [] as string[], strip_ansi: false };
     if (egg.configStartup && typeof egg.configStartup === 'object') {
@@ -173,6 +173,10 @@ export class WingsRemoteService {
       replace: Array<{ match: string; replace_with: string }>;
     }> = [];
 
+    const targetPort = String(server?.allocation?.port ?? 25565);
+    const rawIp = server?.allocation?.ip;
+    const targetIp = rawIp && rawIp.trim() !== '' && rawIp !== '0.0.0.0' && rawIp !== '127.0.0.1' ? rawIp : '0.0.0.0';
+
     if (egg.configFiles) {
       try {
         const parsed = JSON.parse(egg.configFiles);
@@ -184,7 +188,11 @@ export class WingsRemoteService {
               const find = fc.find as Record<string, string> | undefined;
               const replace: Array<{ match: string; replace_with: string }> = [];
               if (find) {
-                for (const [match, replaceWith] of Object.entries(find)) {
+                for (const [match, rawReplaceWith] of Object.entries(find)) {
+                  let replaceWith = String(rawReplaceWith);
+                  replaceWith = replaceWith.replace(/\{\{\s*server\.build\.default\.port\s*\}\}/gi, targetPort);
+                  replaceWith = replaceWith.replace(/\{\{\s*server\.build\.default\.ip\s*\}\}/gi, targetIp);
+                  replaceWith = replaceWith.replace(/\{\{\s*config\.docker\.interface\s*\}\}/gi, targetIp);
                   replace.push({ match, replace_with: replaceWith });
                 }
               }
@@ -195,6 +203,45 @@ export class WingsRemoteService {
       } catch {
         this.logger.warn(`Failed to parse config_files for egg ${egg.id}`);
       }
+    }
+
+    // Ensure server.properties configuration exists and sets IP to 0.0.0.0 (or custom IP) and port to allocated host port
+    const isMinecraftOrGame =
+      egg.configFiles?.includes('server.properties') ||
+      server?.dockerImage?.includes('java') ||
+      egg.name?.toLowerCase().includes('minecraft') ||
+      egg.name?.toLowerCase().includes('paper') ||
+      egg.name?.toLowerCase().includes('purpur') ||
+      egg.name?.toLowerCase().includes('spigot') ||
+      egg.name?.toLowerCase().includes('bungee') ||
+      egg.name?.toLowerCase().includes('velocity') ||
+      egg.name?.toLowerCase().includes('sponge') ||
+      egg.name?.toLowerCase().includes('bedrock') ||
+      !egg.configFiles;
+
+    if (isMinecraftOrGame) {
+      let serverPropsConfig = configs.find(c => c.file === 'server.properties');
+      if (!serverPropsConfig) {
+        serverPropsConfig = {
+          parser: 'properties',
+          file: 'server.properties',
+          replace: [],
+        };
+        configs.push(serverPropsConfig);
+      }
+
+      const setOrUpdateProp = (match: string, replace_with: string) => {
+        const item = serverPropsConfig!.replace.find(r => r.match === match);
+        if (item) {
+          item.replace_with = replace_with;
+        } else {
+          serverPropsConfig!.replace.push({ match, replace_with });
+        }
+      };
+
+      setOrUpdateProp('server-ip', targetIp);
+      setOrUpdateProp('server-port', targetPort);
+      setOrUpdateProp('query.port', targetPort);
     }
 
     return {

@@ -64,6 +64,7 @@ export default function ServerVersionManagerPage({
   const [selectedReleaseType, setSelectedReleaseType] = useState<ReleaseCategory>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [installingVersion, setInstallingVersion] = useState<VersionItem | null>(null);
+  const [confirmWipe, setConfirmWipe] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Fetch Server details for current active jar & variables
@@ -362,7 +363,10 @@ export default function ServerVersionManagerPage({
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => setInstallingVersion(v)}
+                          onClick={() => {
+                            setInstallingVersion(v);
+                            setConfirmWipe(false);
+                          }}
                           disabled={installMutation.isPending}
                           className="h-7 px-2.5 text-[11px] font-semibold gap-1 border-border hover:border-primary hover:text-primary transition-all flex-shrink-0"
                         >
@@ -418,13 +422,13 @@ export default function ServerVersionManagerPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
           <div className="bg-surface border border-border rounded-card max-w-md w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-control bg-primary/10 border border-primary/30 text-primary">
-                <Download className="w-5 h-5" />
+              <div className="p-2.5 rounded-control bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-text-primary">Install Server Software</h3>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Confirm downloading and updating your server build.
+                  Confirm clean installation and software update.
                 </p>
               </div>
             </div>
@@ -448,12 +452,29 @@ export default function ServerVersionManagerPage({
               </div>
             </div>
 
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-control flex items-start gap-2 text-[11px] text-amber-400">
-              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>
-                Installing this version will replace your active server JAR (<strong className="font-mono">{selectedSoftware.defaultJar}</strong>) and automatically configure <code className="font-mono">eula=true</code>. Your world files and player data will be preserved.
-              </span>
+            {/* Critical Data Warning */}
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-control flex items-start gap-2.5 text-xs text-rose-300">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-400" />
+              <div className="space-y-1">
+                <span className="font-bold text-rose-200">Warning: All server files will be wiped!</span>
+                <p className="text-[11px] leading-relaxed text-rose-300/90">
+                  Changing or reinstalling the server version will completely delete all existing files (world data, plugins, configurations, and logs) to install a clean build.
+                </p>
+              </div>
             </div>
+
+            {/* Checkbox Acknowledgment */}
+            <label className="flex items-start gap-2.5 p-2.5 rounded-control bg-surface-elevated/70 border border-border cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={confirmWipe}
+                onChange={(e) => setConfirmWipe(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-0 focus:ring-offset-0 bg-surface cursor-pointer"
+              />
+              <span className="text-xs text-text-secondary leading-snug">
+                I understand that all existing files will be cleared and replaced with a clean installation.
+              </span>
+            </label>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <Button
@@ -465,11 +486,10 @@ export default function ServerVersionManagerPage({
                 Cancel
               </Button>
               <Button
-                variant="primary"
                 size="sm"
                 onClick={confirmInstall}
-                disabled={installMutation.isPending}
-                className="gap-2"
+                disabled={!confirmWipe || installMutation.isPending}
+                className={`gap-2 ${confirmWipe ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'opacity-50 cursor-not-allowed bg-surface-elevated text-text-muted border border-border'}`}
               >
                 {installMutation.isPending ? (
                   <>
@@ -477,7 +497,7 @@ export default function ServerVersionManagerPage({
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Confirm & Install
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Wipe Files & Install
                   </>
                 )}
               </Button>
