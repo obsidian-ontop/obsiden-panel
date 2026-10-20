@@ -574,6 +574,24 @@ export class VersionsService {
       }
     }
 
+    // 4.5 Auto-upgrade dockerImage to Java 21 if installing modern Minecraft (1.20.5+) on Java 17
+    const isJava21Required = (ver: string) => {
+      const match = ver.match(/^1\.(\d+)(?:\.(\d+))?/);
+      if (!match) return false;
+      const minor = parseInt(match[1] || '0', 10);
+      const patch = parseInt(match[2] || '0', 10);
+      return minor > 20 || (minor === 20 && patch >= 5);
+    };
+
+    if (dto.version && isJava21Required(dto.version) && server.dockerImage?.includes('java_17')) {
+      const newImage = 'ghcr.io/pterodactyl/yolks:java_21';
+      this.logger.log(`Auto-upgrading server ${server.uuid} dockerImage to ${newImage} for Minecraft ${dto.version}`);
+      await this.prisma.server.update({
+        where: { id: server.id },
+        data: { dockerImage: newImage },
+      });
+    }
+
     // 5. Sync configuration to Wings so startup command has the new jar
     try {
       await client.syncServer(server.uuid);

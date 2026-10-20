@@ -55,6 +55,17 @@ export class ClientServersController {
     return this.serversService.updateServerVariables(uuid, body.variables);
   }
 
+  @Patch(':uuid/startup')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.STARTUP_UPDATE)
+  @ApiOperation({ summary: 'Update server docker image and startup configuration' })
+  async updateServerStartup(
+    @Param('uuid') uuid: string,
+    @Body() body: { dockerImage?: string; startup?: string },
+  ) {
+    return this.serversService.updateServerStartup(uuid, body);
+  }
+
   @Get(':uuid/ws')
   @UseGuards(ServerAccessGuard)
   @RequirePermissions(Permission.CONTROL_CONSOLE)

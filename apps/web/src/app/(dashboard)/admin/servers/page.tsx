@@ -185,7 +185,7 @@ export default function AdminServersPage() {
       if (images.length > 0) {
         setDockerImage(images[0] as string);
       } else {
-        setDockerImage('ghcr.io/pterodactyl/yolks:java_17');
+        setDockerImage('ghcr.io/pterodactyl/yolks:java_21');
       }
 
       const initialEnv: Record<string, string> = {};

@@ -44,6 +44,25 @@ export default function ServerLayout({
   });
 
   const [powerFeedback, setPowerFeedback] = useState<string | null>(null);
+  const [liveState, setLiveState] = useState<string | null>(null);
+
+  // Sync initial status from server query
+  React.useEffect(() => {
+    if (server?.liveStatus || server?.status) {
+      setLiveState(server.liveStatus || server.status);
+    }
+  }, [server?.liveStatus, server?.status]);
+
+  // Listen for real-time WebSocket status events from Console
+  React.useEffect(() => {
+    const handleStatusEvent = (e: any) => {
+      if (e.detail?.uuid === uuid && e.detail?.status) {
+        setLiveState(e.detail.status);
+      }
+    };
+    window.addEventListener('obsidian:server-status', handleStatusEvent);
+    return () => window.removeEventListener('obsidian:server-status', handleStatusEvent);
+  }, [uuid]);
 
   const powerMutation = useMutation({
     mutationFn: (action: 'start' | 'stop' | 'restart' | 'kill') =>
@@ -51,6 +70,12 @@ export default function ServerLayout({
         method: 'POST',
         body: JSON.stringify({ action }),
       }),
+    onMutate: (action) => {
+      if (action === 'start') setLiveState('starting');
+      if (action === 'restart') setLiveState('starting');
+      if (action === 'stop') setLiveState('stopping');
+      if (action === 'kill') setLiveState('offline');
+    },
     onSuccess: (_, action) => {
       setPowerFeedback(`Power action '${action}' dispatched`);
       setTimeout(() => setPowerFeedback(null), 4000);
@@ -95,6 +120,29 @@ export default function ServerLayout({
     );
   }
 
+  const currentStatus = (liveState || server.liveStatus || server.status || 'offline').toLowerCase();
+
+  const renderStatusBadge = () => {
+    switch (currentStatus) {
+      case 'running':
+      case 'online':
+        return <Badge variant="success" className="animate-pulse">ONLINE</Badge>;
+      case 'starting':
+        return <Badge variant="warning" className="border-amber-500/30 text-amber-400 bg-amber-500/10">STARTING</Badge>;
+      case 'stopping':
+        return <Badge variant="warning" className="border-amber-500/30 text-amber-400 bg-amber-500/10">STOPPING</Badge>;
+      case 'installing':
+        return <Badge variant="warning">INSTALLING</Badge>;
+      case 'install_failed':
+        return <Badge variant="error">INSTALL FAILED</Badge>;
+      case 'suspended':
+        return <Badge variant="error">SUSPENDED</Badge>;
+      case 'offline':
+      default:
+        return <Badge variant="default" className="text-text-muted">OFFLINE</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Server Header Banner */}
@@ -114,12 +162,10 @@ export default function ServerLayout({
                 <h1 className="text-lg font-bold text-text-primary tracking-tight">
                   {server.name}
                 </h1>
-                <Badge variant={server.status === 'installing' ? 'warning' : 'success'}>
-                  {server.status || 'ONLINE'}
-                </Badge>
+                {renderStatusBadge()}
               </div>
               <p className="text-xs font-mono text-text-muted mt-0.5">
-                {server.allocation.ip}:{server.allocation.port} &bull; Node: {server.node.name} &bull; ID: {server.uuidShort}
+                {(server.node?.fqdn || server.allocation?.alias || server.allocation?.ip)}:{server.allocation?.port} &bull; Node: {server.node?.name} &bull; ID: {server.uuidShort}
               </p>
             </div>
           </div>

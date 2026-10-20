@@ -49,7 +49,7 @@ export class ServersService {
           },
       include: {
         node: {
-          select: { id: true, name: true, fqdn: true },
+          select: { id: true, name: true, fqdn: true, scheme: true, daemonPort: true, daemonToken: true },
         },
         allocation: {
           select: { id: true, ip: true, port: true, alias: true },
@@ -68,15 +68,41 @@ export class ServersService {
       orderBy: { id: 'desc' },
     });
 
+    // Query live status from Wings with quick fallback
+    const statusResults = await Promise.allSettled(
+      servers.map(async (s) => {
+        if (s.status && s.status !== 'active') return { uuid: s.uuid, status: s.status };
+        try {
+          const client = this.getWingsClient(s.node);
+          const res = await Promise.race([
+            client.getServerStatus(s.uuid),
+            new Promise<{ status: string }>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), 800),
+            ),
+          ]);
+          return { uuid: s.uuid, status: res?.status || 'offline' };
+        } catch {
+          return { uuid: s.uuid, status: 'offline' };
+        }
+      }),
+    );
+
+    const liveStatusMap: Record<string, string> = {};
+    for (const res of statusResults) {
+      if (res.status === 'fulfilled' && res.value) {
+        liveStatusMap[res.value.uuid] = res.value.status;
+      }
+    }
+
     return servers.map((s) => ({
       id: s.id,
       uuid: s.uuid,
       uuidShort: s.uuidShort,
       name: s.name,
       description: s.description,
-      status: s.status,
+      status: liveStatusMap[s.uuid] || s.status || 'offline',
       node: s.node.name,
-      allocation: `${s.allocation.alias || s.allocation.ip}:${s.allocation.port}`,
+      allocation: `${s.node?.fqdn || s.allocation.alias || s.allocation.ip}:${s.allocation.port}`,
       owner: s.owner ? { id: s.owner.id, username: s.owner.username, email: s.owner.email } : null,
       limits: {
         memory: s.memory,
@@ -129,7 +155,60 @@ export class ServersService {
       throw new NotFoundException(`Server with UUID ${uuid} not found`);
     }
 
-    return server;
+    let liveStatus = 'offline';
+    try {
+      const client = this.getWingsClient(server.node);
+      const res = await Promise.race([
+        client.getServerStatus(server.uuid),
+        new Promise<{ status: string }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 1000),
+        ),
+      ]);
+      if (res?.status) {
+        liveStatus = res.status;
+      }
+    } catch {
+      liveStatus = 'offline';
+    }
+
+    return {
+      ...server,
+      liveStatus: server.status || liveStatus,
+    };
+  }
+
+  async updateServerStartup(uuid: string, data: { dockerImage?: string; startup?: string }) {
+    const server = await this.prisma.server.findUnique({
+      where: { uuid },
+      include: { node: true },
+    });
+    if (!server) {
+      throw new NotFoundException(`Server with UUID ${uuid} not found`);
+    }
+
+    const updateData: { dockerImage?: string; startup?: string } = {};
+    if (data.dockerImage && data.dockerImage.trim()) {
+      updateData.dockerImage = data.dockerImage.trim();
+    }
+    if (data.startup && data.startup.trim()) {
+      updateData.startup = data.startup.trim();
+    }
+
+    const updated = await this.prisma.server.update({
+      where: { uuid },
+      data: updateData,
+      include: { node: true, egg: true },
+    });
+
+    // Sync updated settings to Wings daemon
+    try {
+      const client = this.getWingsClient(updated.node);
+      await client.syncServer(updated.uuid);
+    } catch (err: any) {
+      this.logger.warn(`Failed to sync updated startup/docker image with Wings: ${err.message}`);
+    }
+
+    return updated;
   }
 
   // ─── Provisioning ──────────────────────────────────────────────────
@@ -179,7 +258,7 @@ export class ServersService {
     const uuid = crypto.randomUUID();
     const uuidShort = uuid.substring(0, 8);
 
-    let defaultDockerImage = 'ghcr.io/pterodactyl/yolks:java_17';
+    let defaultDockerImage = 'ghcr.io/pterodactyl/yolks:java_21';
     try {
       const parsedImages = typeof egg.dockerImages === 'object' && egg.dockerImages !== null
         ? egg.dockerImages as Record<string, string>

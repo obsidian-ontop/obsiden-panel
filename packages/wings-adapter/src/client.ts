@@ -152,6 +152,13 @@ export class WingsClient {
     return this.executeRequest<string[]>('/api/servers');
   }
 
+  /**
+   * Get server state/details directly from Wings daemon.
+   */
+  async getServerStatus(serverUuid: string): Promise<{ status: string }> {
+    return this.executeRequest<{ status: string }>(`/api/servers/${serverUuid}`);
+  }
+
   // ─── Server Lifecycle ──────────────────────────────────────────────
 
   async createServer(payload: { uuid: string; start_on_completion?: boolean } | WingsServerConfiguration | any): Promise<void> {

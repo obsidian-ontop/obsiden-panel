@@ -64,15 +64,23 @@ export default function ServersPage() {
   );
 
   const getStatusBadge = (status: string | null) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
+      case 'running':
+      case 'online':
+        return <Badge variant="success">ONLINE</Badge>;
+      case 'starting':
+        return <Badge variant="warning" className="border-amber-500/30 text-amber-400 bg-amber-500/10">STARTING</Badge>;
+      case 'stopping':
+        return <Badge variant="warning" className="border-amber-500/30 text-amber-400 bg-amber-500/10">STOPPING</Badge>;
       case 'installing':
         return <Badge variant="warning">INSTALLING</Badge>;
       case 'install_failed':
         return <Badge variant="error">INSTALL FAILED</Badge>;
       case 'suspended':
         return <Badge variant="error">SUSPENDED</Badge>;
+      case 'offline':
       default:
-        return <Badge variant="success">ONLINE</Badge>;
+        return <Badge variant="default" className="text-text-muted">OFFLINE</Badge>;
     }
   };
 
