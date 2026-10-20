@@ -84,6 +84,19 @@ export class ClientServersController {
     return this.serversService.sendPowerAction(uuid, body.action);
   }
 
+  @Post(':uuid/state')
+  @UseGuards(ServerAccessGuard)
+  @ApiOperation({ summary: 'Update live server state from client/console stream' })
+  async updateLiveState(
+    @Param('uuid') uuid: string,
+    @Body() body: { state: string },
+  ) {
+    if (body.state) {
+      ServersService.setServerState(uuid, body.state);
+    }
+    return { success: true };
+  }
+
   @Post(':uuid/command')
   @UseGuards(ServerAccessGuard)
   @RequirePermissions(Permission.CONTROL_CONSOLE)

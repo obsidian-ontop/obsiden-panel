@@ -46,12 +46,12 @@ export default function ServerLayout({
   const [powerFeedback, setPowerFeedback] = useState<string | null>(null);
   const [liveState, setLiveState] = useState<string | null>(null);
 
-  // Sync initial status from server query
+  // Sync initial status from server query only if not already active
   React.useEffect(() => {
-    if (server?.liveStatus || server?.status) {
+    if (!liveState && (server?.liveStatus || server?.status)) {
       setLiveState(server.liveStatus || server.status);
     }
-  }, [server?.liveStatus, server?.status]);
+  }, [server?.liveStatus, server?.status, liveState]);
 
   // Listen for real-time WebSocket status events from Console
   React.useEffect(() => {

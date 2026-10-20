@@ -137,10 +137,23 @@ export class WingsRemoteService {
     if (egg.configStartup && typeof egg.configStartup === 'object') {
       const cs = egg.configStartup as Record<string, unknown>;
       startup = {
-        done: Array.isArray(cs.done) ? cs.done as string[] : typeof cs.done === 'string' ? [cs.done as string] : [],
-        user_interaction: Array.isArray(cs.user_interaction) ? cs.user_interaction as string[] : [],
+        done: Array.isArray(cs.done) ? (cs.done as string[]) : typeof cs.done === 'string' ? [cs.done as string] : [],
+        user_interaction: Array.isArray(cs.user_interaction) ? (cs.user_interaction as string[]) : [],
         strip_ansi: Boolean(cs.strip_ansi),
       };
+    }
+
+    // Default done matchers for game servers if not explicitly provided by egg
+    if (!startup.done || startup.done.length === 0) {
+      startup.done = [
+        ')! For help, type "help"',
+        'Done (',
+        'For help, type "help"',
+        'Listening on ',
+        'Server started',
+        'Done preparing level',
+        'TPS from last',
+      ];
     }
 
     // Parse stop configuration

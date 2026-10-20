@@ -57,38 +57,30 @@ function formatConsoleLogs(chunk: string): string {
     return '';
   }
 
-  // 2. Separate squashed lines: insert line breaks before known log/daemon prefixes
+  // 2. Separate squashed lines: match any character that is NOT a newline before a tag/timestamp
   formatted = formatted
-    // Ensure line break before [Pterodactyl Daemon]: or [Wings Daemon]:
-    .replace(/(?<!\r?\n)\[(Pterodactyl Daemon|Wings Daemon)\]:/gi, '\r\n[$1]:')
-    // Ensure line break before Minecraft standard timestamps: [15:43:57 INFO]: or [15:43:57.123 WARN]:
-    .replace(
-      /(?<!\r?\n)(\[\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?\s+(?:INFO|WARN|WARNING|ERROR|FATAL|DEBUG|TRACE)\]:?)/gi,
-      '\r\n$1'
-    )
-    // Ensure line break before Minecraft thread format: [15:43:57] [Server thread/INFO]:
-    .replace(
-      /(?<!\r?\n)(\[\d{1,2}:\d{2}:\d{2}(?:\.\d{1,4})?\]\s+\[[^\]]+\]:?)/gi,
-      '\r\n$1'
-    )
-    // Ensure line break before container shell prompt (container@pterodactyl:~$ or container@pterodactyl~)
-    .replace(/(?<!\r?\n)(container@[a-zA-Z0-9_\-]+[:~])/gi, '\r\n$1')
-    // Ensure line break before java version or openjdk info
-    .replace(/(?<!\r?\n)(openjdk version|OpenJDK Runtime|OpenJDK 64-Bit)/gi, '\r\n$1')
-    // Ensure line break before header banners like *** Warning ... ***
-    .replace(/(?<!\r?\n)(\*{3,}[^\*\r\n]+\*{3,})/g, '\r\n$1\r\n')
-    // Ensure line break before server starting commands or main entry
-    .replace(/(?<!\r?\n)(Starting org\.bukkit|Starting minecraft)/gi, '\r\n$1')
-    // Ensure line break before Exception in thread
-    .replace(/(?<!\r?\n)(Exception in thread)/gi, '\r\n$1')
-    // Ensure line break before stack trace entries (at java.base, at org.bukkit, etc.)
-    .replace(/(?<!\r?\n)(\s*at (?:java\.base|org\.bukkit|io\.papermc|net\.minecraft))/gi, '\r\n$1')
-    // Ensure line break before crash/exit info
-    .replace(/(?<!\r?\n)(\[-+ Detected server process)/gi, '\r\n$1')
-    .replace(
-      /(?<!\r?\n)(\[Pterodactyl Daemon\]: (?:Exit code|Out of memory|Aborting automatic restart))/gi,
-      '\r\n$1'
-    );
+    // Break before ANY bracket timestamp: [15:50:01 INFO]: or [15:50:01] or [15:50:01.123]
+    .replace(/([^\r\n])(\[\d{1,2}:\d{2}:\d{2})/g, '$1\r\n$2')
+    // Break before [Pterodactyl Daemon]: or [Wings Daemon]:
+    .replace(/([^\r\n])(\[(?:Pterodactyl|Wings) Daemon\]:)/gi, '$1\r\n$2')
+    // Break before container shell prompt (container@pterodactyl:~$ or container@pterodactyl~)
+    .replace(/([^\r\n])(container@[a-zA-Z0-9_\-]+[:~])/g, '$1\r\n$2')
+    // Break before java version or openjdk info
+    .replace(/([^\r\n])(openjdk version|OpenJDK Runtime|OpenJDK 64-Bit)/gi, '$1\r\n$2')
+    // Break before header banners like *** Warning ... ***
+    .replace(/([^\r\n])(\*{3,})/g, '$1\r\n$2')
+    .replace(/(\*{3,})([^\r\n])/g, '$1\r\n$2')
+    // Break before server starting commands or main entry
+    .replace(/([^\r\n])(Starting (?:org\.bukkit|minecraft))/gi, '$1\r\n$2')
+    // Break before sub-system tags like [ca.spottedleaf... or [bootstrap]
+    .replace(/([^\r\n])(\[[a-zA-Z0-9_\.\-]+\s+[a-zA-Z0-9_\.\-]+\])/gi, '$1\r\n$2')
+    // Break before Exception in thread
+    .replace(/([^\r\n])(Exception in thread)/gi, '$1\r\n$2')
+    // Break before stack trace entries (at java.base, at org.bukkit, etc.)
+    .replace(/([^\r\n])(\s*at (?:java\.base|org\.bukkit|io\.papermc|net\.minecraft))/gi, '$1\r\n$2')
+    // Break before crash/exit info
+    .replace(/([^\r\n])(\[-+ Detected server process)/gi, '$1\r\n$2')
+    .replace(/([^\r\n])(\[Pterodactyl Daemon\]: (?:Exit code|Out of memory|Aborting automatic restart))/gi, '$1\r\n$2');
 
   // 3. Normalize all line breaks to \r\n (prevent staircasing in xterm.js)
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
@@ -279,8 +271,44 @@ export default function ServerConsolePage({
               if (raw.includes('UnsupportedClassVersionError') || raw.includes('class file version 65.0')) {
                 setJavaMismatchDetected(true);
               }
+              // Detect server active running state from Minecraft startup completion or TPS
+              if (
+                raw.includes(')! For help, type "help"') ||
+                raw.includes('Done (') ||
+                raw.includes('TPS from last') ||
+                raw.includes('Starting Minecraft server on')
+              ) {
+                setServerState('running');
+                window.dispatchEvent(
+                  new CustomEvent('obsidian:server-status', {
+                    detail: { uuid, status: 'running' },
+                  }),
+                );
+                fetchApi(`/api/client/servers/${uuid}/state`, {
+                  method: 'POST',
+                  body: JSON.stringify({ state: 'running' }),
+                }).catch(() => {});
+              }
+              // Detect server crash or stop
+              if (
+                raw.includes('Detected server process in a crashed state') ||
+                raw.includes('Aborting automatic restart')
+              ) {
+                setServerState('offline');
+                window.dispatchEvent(
+                  new CustomEvent('obsidian:server-status', {
+                    detail: { uuid, status: 'offline' },
+                  }),
+                );
+                fetchApi(`/api/client/servers/${uuid}/state`, {
+                  method: 'POST',
+                  body: JSON.stringify({ state: 'offline' }),
+                }).catch(() => {});
+              }
               const formatted = formatConsoleLogs(raw);
-              xtermInstance.current?.write(formatted);
+              if (formatted) {
+                xtermInstance.current?.write(formatted);
+              }
               break;
             }
             case 'install output': {
@@ -331,6 +359,10 @@ export default function ServerConsolePage({
                   detail: { uuid, status: st },
                 }),
               );
+              fetchApi(`/api/client/servers/${uuid}/state`, {
+                method: 'POST',
+                body: JSON.stringify({ state: st }),
+              }).catch(() => {});
               break;
             }
             case 'daemon message': {

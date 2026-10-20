@@ -21,6 +21,22 @@ export class ServersService {
     private readonly authService: AuthService,
   ) {}
 
+  private static readonly stateCache = new Map<string, { status: string; ts: number }>();
+
+  static setServerState(uuid: string, status: string) {
+    ServersService.stateCache.set(uuid, { status, ts: Date.now() });
+  }
+
+  static getServerState(uuid: string): string | null {
+    const entry = ServersService.stateCache.get(uuid);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > 15 * 60 * 1000) {
+      ServersService.stateCache.delete(uuid);
+      return null;
+    }
+    return entry.status;
+  }
+
   private getWingsClient(node: {
     scheme: string;
     fqdn: string;
@@ -68,54 +84,31 @@ export class ServersService {
       orderBy: { id: 'desc' },
     });
 
-    // Query live status from Wings with quick fallback
-    const statusResults = await Promise.allSettled(
-      servers.map(async (s) => {
-        if (s.status && s.status !== 'active') return { uuid: s.uuid, status: s.status };
-        try {
-          const client = this.getWingsClient(s.node);
-          const res = await Promise.race([
-            client.getServerStatus(s.uuid),
-            new Promise<{ status: string }>((_, reject) =>
-              setTimeout(() => reject(new Error('timeout')), 800),
-            ),
-          ]);
-          return { uuid: s.uuid, status: res?.status || 'offline' };
-        } catch {
-          return { uuid: s.uuid, status: 'offline' };
-        }
-      }),
-    );
-
-    const liveStatusMap: Record<string, string> = {};
-    for (const res of statusResults) {
-      if (res.status === 'fulfilled' && res.value) {
-        liveStatusMap[res.value.uuid] = res.value.status;
-      }
-    }
-
-    return servers.map((s) => ({
-      id: s.id,
-      uuid: s.uuid,
-      uuidShort: s.uuidShort,
-      name: s.name,
-      description: s.description,
-      status: liveStatusMap[s.uuid] || s.status || 'offline',
-      node: s.node.name,
-      allocation: `${s.node?.fqdn || s.allocation.alias || s.allocation.ip}:${s.allocation.port}`,
-      owner: s.owner ? { id: s.owner.id, username: s.owner.username, email: s.owner.email } : null,
-      limits: {
-        memory: s.memory,
-        swap: s.swap,
-        disk: s.disk,
-        io: s.io,
-        cpu: s.cpu,
-        threads: s.threads,
-      },
-      isOwner: s.userId === userId,
-      permissions: isAdmin || s.userId === userId ? ['*'] : s.subusers[0]?.permissions || [],
-      createdAt: s.createdAt,
-    }));
+    return servers.map((s) => {
+      const cached = ServersService.getServerState(s.uuid);
+      return {
+        id: s.id,
+        uuid: s.uuid,
+        uuidShort: s.uuidShort,
+        name: s.name,
+        description: s.description,
+        status: cached || s.status || 'offline',
+        node: s.node.name,
+        allocation: `${s.node?.fqdn || s.allocation.alias || s.allocation.ip}:${s.allocation.port}`,
+        owner: s.owner ? { id: s.owner.id, username: s.owner.username, email: s.owner.email } : null,
+        limits: {
+          memory: s.memory,
+          swap: s.swap,
+          disk: s.disk,
+          io: s.io,
+          cpu: s.cpu,
+          threads: s.threads,
+        },
+        isOwner: s.userId === userId,
+        permissions: isAdmin || s.userId === userId ? ['*'] : s.subusers[0]?.permissions || [],
+        createdAt: s.createdAt,
+      };
+    });
   }
 
   async getServerByUuid(uuid: string) {
@@ -155,25 +148,10 @@ export class ServersService {
       throw new NotFoundException(`Server with UUID ${uuid} not found`);
     }
 
-    let liveStatus = 'offline';
-    try {
-      const client = this.getWingsClient(server.node);
-      const res = await Promise.race([
-        client.getServerStatus(server.uuid),
-        new Promise<{ status: string }>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 1000),
-        ),
-      ]);
-      if (res?.status) {
-        liveStatus = res.status;
-      }
-    } catch {
-      liveStatus = 'offline';
-    }
-
+    const cachedState = ServersService.getServerState(server.uuid);
     return {
       ...server,
-      liveStatus: server.status || liveStatus,
+      liveStatus: cachedState || server.status || 'offline',
     };
   }
 
@@ -361,6 +339,13 @@ export class ServersService {
     const server = await this.getServerByUuid(uuid);
     const client = this.getWingsClient(server.node);
     await client.sendPowerAction(server.uuid, action);
+    if (action === 'start' || action === 'restart') {
+      ServersService.setServerState(uuid, 'running');
+    } else if (action === 'stop') {
+      ServersService.setServerState(uuid, 'stopping');
+    } else if (action === 'kill') {
+      ServersService.setServerState(uuid, 'offline');
+    }
     return { success: true, action };
   }
 
