@@ -8,12 +8,25 @@ import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
+  const fastifyAdapter = new FastifyAdapter({
+    trustProxy: process.env.TRUSTED_PROXIES?.split(',') ?? false,
+    logger: false,
+    bodyLimit: 104857600, // 100MB (100 * 1024 * 1024 bytes)
+  });
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({
-      trustProxy: process.env.TRUSTED_PROXIES?.split(',') ?? false,
-      logger: false,
-    }),
+    fastifyAdapter,
+  );
+
+  // Register application/octet-stream parser up to 100MB for direct file/plugin uploads
+  const fastifyInstance = app.getHttpAdapter().getInstance();
+  fastifyInstance.addContentTypeParser(
+    'application/octet-stream',
+    { parseAs: 'buffer', bodyLimit: 104857600 },
+    (_req: any, body: any, done: any) => {
+      done(null, body);
+    },
   );
 
   // Security headers

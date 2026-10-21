@@ -146,11 +146,17 @@ export default function ServerVersionManagerPage({
     return filteredVersions.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredVersions, currentPage]);
 
-  // Find active jar
+  // Find active jar & installed version
   const jarVar = server?.variables?.find((v: any) =>
     server?.egg?.variables?.some((ev: any) => ev.id === v.variableId && ev.envVariable === 'SERVER_JARFILE'),
   );
   const currentJar = jarVar?.variableValue || 'paper.jar';
+
+  const mcVerVar = server?.variables?.find((v: any) =>
+    ['MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION'].includes(v.variable?.envVariable) ||
+    server?.egg?.variables?.some((ev: any) => ev.id === v.variableId && ['MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION'].includes(ev.envVariable)),
+  );
+  const installedVersion = mcVerVar?.variableValue && mcVerVar.variableValue !== 'latest' ? mcVerVar.variableValue : (mcVerVar?.variableValue || null);
 
   const confirmInstall = () => {
     if (!installingVersion || !selectedSoftware) return;
@@ -198,11 +204,27 @@ export default function ServerVersionManagerPage({
         </div>
 
         {/* Current Server Setup Badge */}
-        <div className="flex items-center gap-3 p-2.5 px-4 rounded-control bg-surface-elevated border border-border">
-          <div className="w-2 h-2 rounded-full bg-status-running animate-pulse" />
-          <div className="text-left">
-            <span className="text-[10px] text-text-muted uppercase tracking-wider block">Active Server JAR</span>
-            <span className="text-xs font-mono font-medium text-text-primary">{currentJar}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {installedVersion && (
+            <div className="flex items-center gap-2.5 p-2 px-3.5 rounded-control bg-status-running/10 border border-status-running/30">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-running opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-status-running"></span>
+              </span>
+              <div className="text-left">
+                <span className="text-[9.5px] text-status-running font-semibold uppercase tracking-wider block">Installed Version</span>
+                <span className="text-xs font-mono font-bold text-text-primary">
+                  {installedVersion}
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2.5 p-2 px-3.5 rounded-control bg-surface-elevated border border-border">
+            <div className="w-2 h-2 rounded-full bg-primary" />
+            <div className="text-left">
+              <span className="text-[9.5px] text-text-muted uppercase tracking-wider block">Active Server JAR</span>
+              <span className="text-xs font-mono font-medium text-text-primary">{currentJar}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -338,21 +360,38 @@ export default function ServerVersionManagerPage({
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {paginatedVersions.map((v) => {
                     const badgeClass = getBadgeStyle(v.releaseType);
+                    const isInstalled = Boolean(
+                      installedVersion &&
+                      (v.version === installedVersion ||
+                       v.version.toLowerCase() === installedVersion.toLowerCase() ||
+                       (installedVersion.includes(v.version) && v.version.length >= 3))
+                    );
+
                     return (
                       <div
                         key={v.version}
-                        className="p-3 rounded-control bg-surface-elevated border border-border hover:border-primary/50 transition-all flex items-center justify-between gap-2.5 group"
+                        className={`p-3 rounded-control transition-all flex items-center justify-between gap-2.5 group ${
+                          isInstalled
+                            ? 'bg-status-running/10 border-2 border-status-running/60 shadow-md ring-1 ring-status-running/20'
+                            : 'bg-surface-elevated border border-border hover:border-primary/50'
+                        }`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-text-primary font-mono truncate" title={v.version}>
                               {v.version}
                             </span>
-                            <span
-                              className={`text-[8.5px] uppercase px-1.5 py-0.2 rounded font-semibold border ${badgeClass}`}
-                            >
-                              {v.releaseType}
-                            </span>
+                            {isInstalled ? (
+                              <span className="text-[8.5px] uppercase px-1.5 py-0.2 rounded font-bold bg-status-running/25 text-status-running border border-status-running/40 flex items-center gap-0.5">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Installed
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-[8.5px] uppercase px-1.5 py-0.2 rounded font-semibold border ${badgeClass}`}
+                              >
+                                {v.releaseType}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1 text-[10.5px] text-text-muted">
                             <Cpu className="w-3 h-3 text-text-muted flex-shrink-0" />
@@ -362,15 +401,20 @@ export default function ServerVersionManagerPage({
 
                         <Button
                           size="sm"
-                          variant="secondary"
+                          variant={isInstalled ? 'primary' : 'secondary'}
                           onClick={() => {
                             setInstallingVersion(v);
                             setConfirmWipe(false);
                           }}
                           disabled={installMutation.isPending}
-                          className="h-7 px-2.5 text-[11px] font-semibold gap-1 border-border hover:border-primary hover:text-primary transition-all flex-shrink-0"
+                          className={`h-7 px-2.5 text-[11px] font-semibold gap-1 transition-all flex-shrink-0 ${
+                            isInstalled
+                              ? 'bg-status-running hover:bg-status-running/90 text-black border-transparent'
+                              : 'border-border hover:border-primary hover:text-primary'
+                          }`}
                         >
-                          <Download className="w-3 h-3" /> Install
+                          <Download className="w-3 h-3" />
+                          {isInstalled ? 'Reinstall' : 'Install'}
                         </Button>
                       </div>
                     );

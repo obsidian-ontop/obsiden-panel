@@ -26,6 +26,57 @@ import { Button } from '../../../../components/ui/button';
 import { Badge } from '../../../../components/ui/badge';
 import { formatMemory } from '../../../../lib/utils';
 
+// Corner metallic hex screw/rivet component for skeuomorphic server chassis
+function HexRivet() {
+  return (
+    <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-zinc-300 via-zinc-600 to-zinc-900 border border-zinc-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-center">
+      <div className="w-[4px] h-[0.75px] bg-zinc-900 rotate-45" />
+    </div>
+  );
+}
+
+// Skeuomorphic discrete multi-segment tactile LED bar for nodes
+function SkeuomorphicNodeBar({
+  percent,
+  color = 'cyan',
+}: {
+  percent: number;
+  color?: 'cyan' | 'amber' | 'emerald' | 'purple';
+}) {
+  const total = 16;
+  const active = Math.round((Math.max(0, Math.min(100, percent)) / 100) * total);
+
+  return (
+    <div className="relative p-1 rounded bg-[#06080d] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-[35%] bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
+      <div className="flex items-center gap-[2.5px]">
+        {Array.from({ length: total }).map((_, idx) => {
+          const isLit = idx < active;
+          const isWarning = idx >= 11 && idx < 14;
+          const isCritical = idx >= 14;
+
+          let litStyle = 'bg-[#06b6d4] shadow-[0_0_8px_#06b6d4,inset_0_1px_1px_#a5f3fc]';
+          if (color === 'emerald') litStyle = 'bg-[#10b981] shadow-[0_0_8px_#10b981,inset_0_1px_1px_#a7f3d0]';
+          if (color === 'amber') litStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
+          if (color === 'purple') litStyle = 'bg-[#a855f7] shadow-[0_0_8px_#a855f7,inset_0_1px_1px_#e9d5ff]';
+
+          if (isWarning) litStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
+          if (isCritical) litStyle = 'bg-[#ef4444] shadow-[0_0_8px_#ef4444,inset_0_1px_1px_#fecaca]';
+
+          const unlitStyle = isCritical ? 'bg-[#290d0d]' : isWarning ? 'bg-[#281809]' : 'bg-[#09121c]';
+
+          return (
+            <div
+              key={idx}
+              className={`flex-1 h-2 rounded-[1px] transition-all duration-150 ${isLit ? litStyle : unlitStyle}`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function NodeHeartbeatBadge({ nodeId }: { nodeId: number }) {
   const { data, isLoading } = useQuery<any>({
     queryKey: ['node-heartbeat', nodeId],
@@ -36,29 +87,30 @@ function NodeHeartbeatBadge({ nodeId }: { nodeId: number }) {
 
   if (isLoading) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-elevated border border-border text-text-muted">
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-pulse" />
-        Heartbeat...
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#070a10] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] text-[10px] font-mono text-zinc-400">
+        <span className="w-2 h-2 rounded-full bg-zinc-600 animate-pulse" />
+        POLLING...
       </span>
     );
   }
 
   if (data?.online) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-status-running/10 border border-status-running/30 text-status-running">
-        <span className="relative flex h-2 w-2">
+      <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#070a10] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] text-[10px] font-mono text-emerald-400 font-bold">
+        {/* Optical jewel LED lens */}
+        <span className="relative flex h-2.5 w-2.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-running opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-status-running"></span>
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_8px_#10b981]"></span>
         </span>
-        Wings Online {data.systemInfo?.version ? `(${data.systemInfo.version})` : ''}
+        WINGS ONLINE {data.systemInfo?.version ? `(${data.systemInfo.version})` : ''}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-status-error/10 border border-status-error/30 text-status-error">
-      <span className="h-2 w-2 rounded-full bg-status-error"></span>
-      Wings Offline
+    <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#070a10] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] text-[10px] font-mono text-rose-400 font-bold">
+      <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ef4444]"></span>
+      WINGS OFFLINE
     </span>
   );
 }
@@ -729,134 +781,157 @@ export default function AdminNodesPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {nodes?.map((node) => (
-            <Card key={node.id} className="p-5">
+            <div
+              key={node.id}
+              className="bg-gradient-to-b from-[#1c222d] via-[#141821] to-[#0c0f16] border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-5 relative overflow-hidden flex flex-col justify-between gap-4"
+            >
+              {/* Top Faceplate Header with Screws */}
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-control bg-surface-elevated border border-border flex items-center justify-center text-primary">
-                    <HardDrive className="w-5 h-5" />
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-md bg-[#070a10] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.08)] flex items-center justify-center text-primary">
+                    <Server className="w-5 h-5 drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-text-primary">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-sm font-bold font-mono tracking-tight text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                         {node.name}
                       </h3>
                       <NodeHeartbeatBadge nodeId={node.id} />
                     </div>
-                    <p className="text-xs font-mono text-text-muted mt-0.5">
-                      {node.scheme}://{node.fqdn}:{node.daemonPort} &bull; {node.location?.short}
+                    <p className="text-xs font-mono text-zinc-400 mt-0.5">
+                      {node.scheme}://{node.fqdn}:{node.daemonPort} &bull; <span className="text-primary font-semibold">{node.location?.short}</span>
                     </p>
                   </div>
                 </div>
 
+                {/* Tactile Hardware Action Buttons */}
                 <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                  <button
                     onClick={() => setAllocationsNodeId(node.id)}
                     title="Manage Port Allocations for this Node"
-                    className="gap-1"
+                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
                     <Network className="w-3.5 h-3.5 text-primary" /> Allocations
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                  </button>
+                  <button
                     onClick={() => testConnMutation.mutate(node.id)}
                     title="Test authenticated connection to Wings daemon"
+                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> Test
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                    <RefreshCw className="w-3.5 h-3.5 text-emerald-400" /> Test
+                  </button>
+                  <button
                     onClick={() => setConfigNodeId(node.id)}
                     title="View Wings config.yml"
+                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
-                    <FileCode className="w-3.5 h-3.5" /> Config
-                  </Button>
+                    <FileCode className="w-3.5 h-3.5 text-sky-400" /> Config
+                  </button>
                   <button
                     onClick={() => {
                       if (confirm(`Delete node ${node.name}?`)) {
                         deleteMutation.mutate(node.id);
                       }
                     }}
-                    className="p-1.5 text-text-muted hover:text-status-error transition-colors rounded"
+                    className="p-1.5 rounded bg-gradient-to-b from-[#2a1719] to-[#1a0f11] border border-rose-500/20 text-zinc-400 hover:text-rose-400 shadow-[0_2px_4px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] transition-colors"
                     title="Delete Node"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Resource capacity usage bars */}
-              <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-border/60">
-                <div>
-                  <div className="flex items-center justify-between text-[11px] mb-1.5">
-                    <span className="text-text-muted">Memory Allocation</span>
-                    <span className="font-mono text-text-primary">
+              {/* Skeuomorphic Resource Allocation Gauges */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-white/[0.06]">
+                {/* Memory Allocation Gauge */}
+                <div className="p-3 rounded-md bg-[#07090e] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-3 h-3 text-cyan-400" /> Memory Pool
+                    </span>
+                    <span className="text-cyan-400 font-bold drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                      {Math.round(node.stats.memoryUsagePercent)}%
+                    </span>
+                  </div>
+                  <SkeuomorphicNodeBar percent={node.stats.memoryUsagePercent} color="cyan" />
+                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                    <span>ALLOCATED</span>
+                    <span className="text-zinc-300 font-bold">
                       {formatMemory(node.stats.allocatedMemory)} / {formatMemory(node.memory)}
                     </span>
                   </div>
-                  <div className="w-full bg-surface-elevated rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className="bg-primary h-full transition-all"
-                      style={{ width: `${Math.min(node.stats.memoryUsagePercent, 100)}%` }}
-                    />
-                  </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-[11px] mb-1.5">
-                    <span className="text-text-muted">Disk Allocation</span>
-                    <span className="font-mono text-text-primary">
-                      {formatMemory(node.stats.allocatedDisk)} / {formatMemory(node.disk)}
+                {/* Disk Allocation Gauge */}
+                <div className="p-3 rounded-md bg-[#07090e] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <HardDrive className="w-3 h-3 text-amber-400" /> Storage Pool
+                    </span>
+                    <span className="text-amber-400 font-bold drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]">
+                      {Math.round(node.stats.diskUsagePercent)}%
                     </span>
                   </div>
-                  <div className="w-full bg-surface-elevated rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className="bg-status-stopping h-full transition-all"
-                      style={{ width: `${Math.min(node.stats.diskUsagePercent, 100)}%` }}
-                    />
+                  <SkeuomorphicNodeBar percent={node.stats.diskUsagePercent} color="amber" />
+                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                    <span>ALLOCATED</span>
+                    <span className="text-zinc-300 font-bold">
+                      {formatMemory(node.stats.allocatedDisk)} / {formatMemory(node.disk)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Real-time Telemetry & Heartbeat Activity */}
-              <div className="mt-4 p-3 rounded-control bg-surface-elevated/40 border border-border/80">
-                <div className="flex items-center justify-between text-[11px] mb-2 font-medium">
-                  <span className="text-text-secondary flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-primary" /> Live Daemon Telemetry
+              {/* Skeuomorphic Real-time Telemetry Spectrum Analyzer */}
+              <div className="p-3 rounded-md bg-[#05070c] border border-black shadow-[inset_0_3px_6px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] relative overflow-hidden">
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-20 z-10"
+                  style={{
+                    background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
+                  }}
+                />
+                <div className="flex items-center justify-between text-[10.5px] font-mono mb-2 relative z-20">
+                  <span className="text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 font-bold">
+                    <Activity className="w-3 h-3 text-emerald-400" /> Daemon Telemetry Analyzer
                   </span>
-                  <span className="font-mono text-[10px] text-text-muted">12s Polling</span>
+                  <span className="text-[10px] text-zinc-500 uppercase">12s Pulse</span>
                 </div>
-                
-                <div className="h-8 w-full flex items-end gap-1 pt-1">
+
+                <div className="h-10 w-full flex items-end gap-1.5 pt-1 relative z-20">
                   {[25, 45, 30, 60, 40, 75, 50, Math.round(node.stats.memoryUsagePercent || 15), Math.round(node.stats.diskUsagePercent || 10)].map((val, idx) => (
                     <div
                       key={idx}
-                      className="flex-1 rounded-t transition-all duration-500 bg-primary/40 hover:bg-primary"
-                      style={{ height: `${Math.max(15, Math.min(val, 100))}%` }}
-                      title={`Telemetry Sample: ${val}%`}
-                    />
+                      className="flex-1 flex flex-col justify-end gap-[1px] h-full"
+                    >
+                      <div
+                        className="w-full rounded-[1px] transition-all duration-500 bg-emerald-400 shadow-[0_0_8px_#10b981]"
+                        style={{ height: `${Math.max(15, Math.min(val, 100))}%` }}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between mt-4 text-[11px] font-mono text-text-muted">
-                <span>Total Servers: <strong>{node.stats.totalServers}</strong></span>
-                <span className="flex items-center gap-1.5">
-                  <span>Total Allocations: <strong>{node.stats.totalAllocations}</strong></span>
+              {/* Bottom Chassis Details Bar with Hex Screws */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-[11px] font-mono text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <HexRivet />
+                  <span>SERVERS: <strong className="text-text-primary">{node.stats.totalServers}</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>PORTS: <strong className="text-text-primary">{node.stats.totalAllocations}</strong></span>
                   <button
                     onClick={() => setAllocationsNodeId(node.id)}
-                    className="text-primary hover:underline"
+                    className="text-primary hover:underline font-semibold"
                   >
                     (Manage)
                   </button>
-                </span>
+                  <HexRivet />
+                </div>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}

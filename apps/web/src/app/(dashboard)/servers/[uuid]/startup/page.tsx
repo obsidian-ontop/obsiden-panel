@@ -225,30 +225,48 @@ export default function ServerStartupPage({
         </CardHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {server?.variables?.map((v: any) => (
-            <div
-              key={v.id}
-              className="p-3 bg-surface-elevated border border-border rounded-control space-y-1.5"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-text-primary">
-                  {v.variable.name}
-                </span>
-                <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                  {v.variable.envVariable}
-                </span>
+          {server?.variables?.map((v: any) => {
+            const isVersionVar = ['MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION'].includes(v.variable.envVariable);
+            return (
+              <div
+                key={v.id}
+                className={`p-3 rounded-control space-y-1.5 border ${
+                  isVersionVar
+                    ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20'
+                    : 'bg-surface-elevated border border-border'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                    {v.variable.name}
+                    {isVersionVar && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-status-running/20 text-status-running border border-status-running/30">
+                        Installed
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    {v.variable.envVariable}
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted">
+                  {isVersionVar
+                    ? 'Active installed version on server container (managed in Versions tab).'
+                    : v.variable.description || 'No description provided.'}
+                </p>
+                <input
+                  type="text"
+                  readOnly
+                  value={v.variableValue}
+                  className={`w-full px-2.5 py-1.5 rounded text-xs font-mono focus:outline-none ${
+                    isVersionVar
+                      ? 'bg-surface border border-primary/40 text-primary font-bold'
+                      : 'bg-surface border border-border text-text-primary'
+                  }`}
+                />
               </div>
-              <p className="text-[11px] text-text-muted">
-                {v.variable.description || 'No description provided.'}
-              </p>
-              <input
-                type="text"
-                readOnly
-                value={v.variableValue}
-                className="w-full px-2.5 py-1.5 bg-surface border border-border rounded text-xs font-mono text-text-primary focus:outline-none"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
     </div>

@@ -85,17 +85,34 @@ export default function ServerFilesPage({
 
   const uploadFiles = async (fileList: FileList | File[]) => {
     if (!fileList || fileList.length === 0) return;
+    const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+
+    for (let i = 0; i < fileList.length; i++) {
+      const f = fileList[i];
+      if (f && f.size > MAX_UPLOAD_BYTES) {
+        alert(`File "${f.name}" (${formatBytes(f.size)}) exceeds the 100MB maximum upload limit.`);
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       for (let i = 0; i < fileList.length; i++) {
         const f = fileList[i];
         if (!f) continue;
         const targetPath = currentDirectory === '/' ? `/${f.name}` : `${currentDirectory}/${f.name}`;
-        const content = await f.text();
-        await fetchApi(`/api/client/servers/${uuid}/files/write?file=${encodeURIComponent(targetPath)}`, {
+        const res = await fetch(`/api/client/servers/${uuid}/files/write?file=${encodeURIComponent(targetPath)}`, {
           method: 'POST',
-          body: JSON.stringify({ content }),
+          headers: {
+            'Content-Type': 'application/octet-stream',
+          },
+          body: f,
+          credentials: 'include',
         });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || `Upload failed with HTTP ${res.status}`);
+        }
       }
       refetch();
     } catch (err: any) {
@@ -264,10 +281,14 @@ export default function ServerFilesPage({
             variant="secondary"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            title="Upload Files"
+            title="Upload Files (Up to 100MB)"
+            className="gap-1.5"
           >
             <Upload className="w-3.5 h-3.5" /> Upload
           </Button>
+          <span className="text-[10px] font-mono text-text-muted bg-surface-elevated/70 border border-border px-2 py-1 rounded">
+            Limit: 100MB
+          </span>
 
           <Button
             variant="secondary"

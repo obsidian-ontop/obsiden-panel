@@ -91,6 +91,7 @@ export default function ServerLayout({
     { label: 'Console', href: `/servers/${uuid}`, icon: Terminal },
     { label: 'Files', href: `/servers/${uuid}/files`, icon: FolderOpen },
     { label: 'Versions', href: `/servers/${uuid}/versions`, icon: Layers },
+    { label: 'Plugins', href: `/servers/${uuid}/plugins`, icon: Puzzle },
     { label: 'Databases', href: `/servers/${uuid}/databases`, icon: Database },
     { label: 'Schedules', href: `/servers/${uuid}/schedules`, icon: Calendar },
     { label: 'Backups', href: `/servers/${uuid}/backups`, icon: Archive },

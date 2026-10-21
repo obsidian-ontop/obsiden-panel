@@ -511,7 +511,7 @@ export class ServersService {
     return client.getFileContents(server.uuid, filePath);
   }
 
-  async writeFile(uuid: string, filePath: string, content: string) {
+  async writeFile(uuid: string, filePath: string, content: string | Buffer) {
     const server = await this.getServerByUuid(uuid);
     const client = this.getWingsClient(server.node);
     await client.writeFile(server.uuid, filePath, content);

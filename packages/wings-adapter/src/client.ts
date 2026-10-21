@@ -80,9 +80,9 @@ export class WingsClient {
       ...headers,
     };
 
-    let serializedBody: string | undefined;
+    let serializedBody: string | Buffer | Uint8Array | undefined;
     if (body !== undefined) {
-      if (typeof body === 'string') {
+      if (typeof body === 'string' || Buffer.isBuffer(body) || body instanceof Uint8Array) {
         serializedBody = body;
       } else {
         serializedBody = JSON.stringify(body);
@@ -256,14 +256,14 @@ export class WingsClient {
   async writeFile(
     serverUuid: string,
     filePath: string,
-    content: string,
+    content: string | Buffer | Uint8Array,
   ): Promise<void> {
     const encodedFile = encodeURIComponent(filePath);
     await this.executeRequest(
       `/api/servers/${serverUuid}/files/write?file=${encodedFile}`,
       'POST',
       content,
-      { 'Content-Type': 'text/plain' },
+      { 'Content-Type': 'application/octet-stream' },
     );
   }
 
@@ -282,6 +282,20 @@ export class WingsClient {
       url,
       file_name: fileName,
       foreground,
+    });
+  }
+
+  /**
+   * Create a directory inside the server filesystem.
+   */
+  async createFolder(
+    serverUuid: string,
+    root: string = '/',
+    name: string,
+  ): Promise<void> {
+    await this.executeRequest(`/api/servers/${serverUuid}/files/create-directory`, 'POST', {
+      root,
+      name,
     });
   }
 

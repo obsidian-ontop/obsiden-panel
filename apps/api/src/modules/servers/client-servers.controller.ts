@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import { ServersService } from './servers.service';
 import { VersionsService } from './versions.service';
+import { PluginsService } from './plugins.service';
 import { SessionGuard } from '../auth/guards/session.guard';
 import { ServerAccessGuard, RequirePermissions } from './guards/server-access.guard';
 import { Permission } from '@obsidian/permissions';
@@ -26,6 +27,7 @@ export class ClientServersController {
   constructor(
     private readonly serversService: ServersService,
     private readonly versionsService: VersionsService,
+    private readonly pluginsService: PluginsService,
   ) {}
 
   @Get()
@@ -139,9 +141,22 @@ export class ClientServersController {
   async writeFile(
     @Param('uuid') uuid: string,
     @Query('file') file: string,
-    @Body() body: { content: string },
+    @Req() req: any,
+    @Body() body: any,
   ) {
-    return this.serversService.writeFile(uuid, file, body.content);
+    let content: string | Buffer;
+    if (Buffer.isBuffer(req.body)) {
+      content = req.body;
+    } else if (body && typeof body === 'object' && body.isBase64 && typeof body.content === 'string') {
+      content = Buffer.from(body.content, 'base64');
+    } else if (body && typeof body === 'object' && typeof body.content === 'string') {
+      content = body.content;
+    } else if (typeof body === 'string') {
+      content = body;
+    } else {
+      content = '';
+    }
+    return this.serversService.writeFile(uuid, file, content);
   }
 
   @Post(':uuid/files/rename')
@@ -372,5 +387,65 @@ export class ClientServersController {
   ) {
     return this.versionsService.installVersion(uuid, body);
   }
+
+  // ─── Plugin Manager ─────────────────────────────────────────────────
+
+  @Get(':uuid/plugins')
+  @UseGuards(ServerAccessGuard)
+  @ApiOperation({ summary: 'Search and browse plugins from SpigotMC and Modrinth' })
+  async searchPlugins(
+    @Query('query') query?: string,
+    @Query('source') source?: 'all' | 'spigot' | 'modrinth',
+    @Query('page') page?: string,
+  ) {
+    const pageNum = Math.max(1, parseInt(page || '1', 10) || 1);
+    return this.pluginsService.searchPlugins(query || '', source || 'all', pageNum);
+  }
+
+  @Get(':uuid/plugins/installed')
+  @UseGuards(ServerAccessGuard)
+  @ApiOperation({ summary: 'List installed plugins from server /plugins directory' })
+  async getInstalledPlugins(@Param('uuid') uuid: string) {
+    return this.pluginsService.getInstalledPlugins(uuid);
+  }
+
+  @Post(':uuid/plugins/install')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.FILE_UPDATE)
+  @ApiOperation({ summary: 'Install a plugin from SpigotMC or Modrinth into /plugins' })
+  async installPlugin(
+    @Param('uuid') uuid: string,
+    @Body()
+    body: {
+      source: 'spigot' | 'modrinth';
+      pluginId: string;
+      fileName?: string;
+    },
+  ) {
+    return this.pluginsService.installPlugin(uuid, body);
+  }
+
+  @Delete(':uuid/plugins/uninstall')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.FILE_DELETE)
+  @ApiOperation({ summary: 'Uninstall (delete) a plugin from /plugins' })
+  async uninstallPlugin(
+    @Param('uuid') uuid: string,
+    @Body() body: { fileName: string },
+  ) {
+    return this.pluginsService.uninstallPlugin(uuid, body.fileName);
+  }
+
+  @Post(':uuid/plugins/toggle')
+  @UseGuards(ServerAccessGuard)
+  @RequirePermissions(Permission.FILE_UPDATE)
+  @ApiOperation({ summary: 'Enable or disable a plugin' })
+  async togglePlugin(
+    @Param('uuid') uuid: string,
+    @Body() body: { fileName: string },
+  ) {
+    return this.pluginsService.togglePlugin(uuid, body.fileName);
+  }
 }
+
 

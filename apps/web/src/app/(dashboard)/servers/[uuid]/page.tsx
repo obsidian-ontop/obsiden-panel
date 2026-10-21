@@ -16,6 +16,10 @@ import {
   Sparkles,
   AlertTriangle,
   RotateCw,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  Gauge,
 } from 'lucide-react';
 import { Card } from '../../../../components/ui/card';
 import { Button } from '../../../../components/ui/button';
@@ -28,7 +32,116 @@ interface ServerMetrics {
   disk_bytes: number;
   network: { rx_bytes: number; tx_bytes: number };
   state: string;
+  uptime?: number;
 }
+
+// Corner metallic hex screw/rivet component for skeuomorphic chassis
+function HexRivet() {
+  return (
+    <div className="w-2 h-2 rounded-full bg-gradient-to-br from-zinc-400 via-zinc-600 to-zinc-900 border border-zinc-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-center">
+      <div className="w-[3px] h-[0.75px] bg-zinc-900 rotate-45" />
+    </div>
+  );
+}
+
+// Skeuomorphic discrete 20-segment tactile LED gauge bar
+function SkeuomorphicLedBar({
+  percent,
+  color = 'cyan',
+}: {
+  percent: number;
+  color?: 'cyan' | 'emerald' | 'amber' | 'purple';
+}) {
+  const totalSegments = 20;
+  const activeSegments = Math.round((Math.max(0, Math.min(100, percent)) / 100) * totalSegments);
+
+  return (
+    <div className="relative p-1 rounded bg-[#06080d] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] overflow-hidden">
+      {/* Subtle glass reflection sheen */}
+      <div className="absolute inset-x-0 top-0 h-[40%] bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
+      <div className="flex items-center gap-[2.5px]">
+        {Array.from({ length: totalSegments }).map((_, idx) => {
+          const isActive = idx < activeSegments;
+          const isWarning = idx >= 14 && idx < 17;
+          const isCritical = idx >= 17;
+
+          let activeStyle = 'bg-[#06b6d4] shadow-[0_0_8px_#06b6d4,inset_0_1px_1px_#a5f3fc]';
+          if (color === 'emerald') activeStyle = 'bg-[#10b981] shadow-[0_0_8px_#10b981,inset_0_1px_1px_#a7f3d0]';
+          if (color === 'amber') activeStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
+          if (color === 'purple') activeStyle = 'bg-[#a855f7] shadow-[0_0_8px_#a855f7,inset_0_1px_1px_#e9d5ff]';
+
+          if (isWarning) activeStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
+          if (isCritical) activeStyle = 'bg-[#ef4444] shadow-[0_0_8px_#ef4444,inset_0_1px_1px_#fecaca]';
+
+          const inactiveStyle = isCritical
+            ? 'bg-[#290d0d]'
+            : isWarning
+            ? 'bg-[#281809]'
+            : 'bg-[#09121c]';
+
+          return (
+            <div
+              key={idx}
+              className={`flex-1 h-2 rounded-[1px] transition-all duration-150 ${
+                isActive ? activeStyle : inactiveStyle
+              }`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Skeuomorphic CRT Oscilloscope / Telemetry Waveform Display
+function SkeuomorphicOscilloscope({
+  points,
+  color = '#06b6d4',
+}: {
+  points: number[];
+  color?: string;
+}) {
+  const max = Math.max(100, ...points);
+  const min = 0;
+  const range = max - min || 1;
+  const height = 30;
+  const width = 160;
+  const step = width / (points.length - 1 || 1);
+
+  const pathD = points
+    .map((val, idx) => {
+      const x = idx * step;
+      const y = height - (val / range) * (height - 6) - 3;
+      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  return (
+    <div className="relative h-8 w-full rounded bg-[#040608] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95)] overflow-hidden">
+      {/* CRT scanlines effect */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-25 z-10"
+        style={{
+          background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
+        }}
+      />
+      {/* Illuminated Grid lines */}
+      <svg className="absolute inset-0 w-full h-full stroke-cyan-500/10 pointer-events-none" width="100%" height="100%">
+        <line x1="0" y1="33%" x2="100%" y2="33%" strokeDasharray="2,2" />
+        <line x1="0" y1="66%" x2="100%" y2="66%" strokeDasharray="2,2" />
+        <line x1="25%" y1="0" x2="25%" y2="100%" strokeDasharray="2,2" />
+        <line x1="50%" y1="0" x2="50%" y2="100%" strokeDasharray="2,2" />
+        <line x1="75%" y1="0" x2="75%" y2="100%" strokeDasharray="2,2" />
+      </svg>
+      {/* Phosphor wave */}
+      <svg className="w-full h-full overflow-visible relative z-0" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <path d={pathD} fill="none" stroke={color} strokeWidth="3" opacity="0.35" className="blur-[1.5px]" />
+        <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" />
+      </svg>
+    </div>
+  );
+}
+
 
 /**
  * Cleanly formats and colors raw console stream output:
@@ -153,6 +266,9 @@ export default function ServerConsolePage({
   const [isFixingJava, setIsFixingJava] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [cpuHistory, setCpuHistory] = useState<number[]>([12, 18, 15, 22, 19, 25, 20, 28, 22, 18, 24, 20, 16, 22, 28, 24, 20, 25, 22, 20]);
+  const [uptimeMs, setUptimeMs] = useState<number>(0);
+
   const [metrics, setMetrics] = useState<ServerMetrics>({
     cpu_absolute: 0,
     memory_bytes: 0,
@@ -160,7 +276,35 @@ export default function ServerConsolePage({
     disk_bytes: 0,
     network: { rx_bytes: 0, tx_bytes: 0 },
     state: 'unknown',
+    uptime: 0,
   });
+
+  // Uptime active local second ticker
+  useEffect(() => {
+    if (serverState !== 'running') return;
+    const interval = setInterval(() => {
+      setUptimeMs((prev) => (prev > 0 ? prev + 1000 : 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [serverState]);
+
+  const formatDigitalUptime = (ms: number) => {
+    if (serverState !== 'running' || ms <= 0) {
+      return { days: 0, hours: '00', mins: '00', secs: '00', label: '00:00:00' };
+    }
+    const totalSecs = Math.floor(ms / 1000);
+    const days = Math.floor(totalSecs / 86400);
+    const hours = String(Math.floor((totalSecs % 86400) / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((totalSecs % 3600) / 60)).padStart(2, '0');
+    const secs = String(totalSecs % 60).padStart(2, '0');
+    return {
+      days,
+      hours,
+      mins,
+      secs,
+      label: days > 0 ? `${days}d ${hours}h ${mins}m` : `${hours}:${mins}:${secs}`,
+    };
+  };
 
   // Fetch WebSocket credentials
   const { data: wsCreds } = useQuery({
@@ -338,7 +482,22 @@ export default function ServerConsolePage({
               if (payload.args?.[0]) {
                 try {
                   const parsed = JSON.parse(payload.args[0]);
-                  setMetrics(parsed);
+                  setMetrics((prev) => ({
+                    ...prev,
+                    ...parsed,
+                    uptime: parsed.uptime ?? prev.uptime,
+                  }));
+                  if (typeof parsed.uptime === 'number' && parsed.uptime > 0) {
+                    const norm = parsed.uptime > 100000000000
+                      ? Date.now() - parsed.uptime
+                      : parsed.uptime > 10000
+                      ? parsed.uptime
+                      : parsed.uptime * 1000;
+                    setUptimeMs(norm);
+                  }
+                  if (typeof parsed.cpu_absolute === 'number') {
+                    setCpuHistory((prev) => [...prev.slice(1), parsed.cpu_absolute]);
+                  }
                   if (parsed.state) {
                     setServerState(parsed.state);
                     window.dispatchEvent(
@@ -510,86 +669,243 @@ export default function ServerConsolePage({
         </div>
       )}
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-3.5 bg-surface border-border">
+      {/* Skeuomorphic Hardware Instrument Modules */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* Module 1: CPU Processor Unit */}
+        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
+          {/* Top Chassis Bezel with Hex Screws */}
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-text-muted flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-primary" /> CPU Usage
+            <HexRivet />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <Cpu className="w-3 h-3 text-cyan-400" /> CPU Core
             </span>
-            <span className="text-xs font-mono font-medium text-text-primary">
+            <HexRivet />
+          </div>
+
+          {/* Recessed VFD Digital Screen */}
+          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">LOAD</span>
+            <span className="text-sm font-mono font-bold text-cyan-400 tracking-tight drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]">
               {metrics.cpu_absolute.toFixed(1)}%
             </span>
           </div>
-          <div className="w-full bg-surface-elevated rounded-full h-1.5 mt-2.5 overflow-hidden">
-            <div
-              className="bg-primary h-full transition-all duration-300"
-              style={{ width: `${Math.min(metrics.cpu_absolute, 100)}%` }}
-            />
-          </div>
-        </Card>
 
-        <Card className="p-3.5 bg-surface border-border">
+          {/* 20-Segment Tactile LED Bar */}
+          <SkeuomorphicLedBar percent={metrics.cpu_absolute} color="cyan" />
+
+          {/* Recessed CRT Oscilloscope Trace */}
+          <div className="pt-0.5">
+            <SkeuomorphicOscilloscope points={cpuHistory} color="#06b6d4" />
+          </div>
+
+          {/* Bottom Chassis Bezel with Hex Screws */}
+          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
+            <HexRivet />
+            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">SMP RACK-01</span>
+            <HexRivet />
+          </div>
+        </div>
+
+        {/* Module 2: Memory Buffer Tank */}
+        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-text-muted flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-status-running" /> Memory
+            <HexRivet />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <Activity className="w-3 h-3 text-emerald-400" /> RAM Reservoir
             </span>
-            <span className="text-xs font-mono font-medium text-text-primary">
+            <HexRivet />
+          </div>
+
+          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">USED</span>
+            <span className="text-sm font-mono font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]">
               {formatBytes(metrics.memory_bytes)}
             </span>
           </div>
-          <div className="w-full bg-surface-elevated rounded-full h-1.5 mt-2.5 overflow-hidden">
-            <div
-              className="bg-status-running h-full transition-all duration-300"
-              style={{
-                width: `${
-                  metrics.memory_limit_bytes > 0
-                    ? Math.min((metrics.memory_bytes / metrics.memory_limit_bytes) * 100, 100)
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-        </Card>
 
-        <Card className="p-3.5 bg-surface border-border">
+          {/* Memory Fill Percentage */}
+          {(() => {
+            const memPercent =
+              metrics.memory_limit_bytes > 0
+                ? (metrics.memory_bytes / metrics.memory_limit_bytes) * 100
+                : 25;
+            return (
+              <>
+                <SkeuomorphicLedBar percent={memPercent} color="emerald" />
+                <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                  <span className="text-zinc-500 uppercase">Limit:</span>
+                  <span className="text-emerald-300 font-bold">
+                    {metrics.memory_limit_bytes > 0 ? formatBytes(metrics.memory_limit_bytes) : 'UNLIMITED'}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+
+          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
+            <HexRivet />
+            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">DDR5 ECC RAM</span>
+            <HexRivet />
+          </div>
+        </div>
+
+        {/* Module 3: Storage Unit */}
+        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-text-muted flex items-center gap-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-status-stopping" /> Disk
+            <HexRivet />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <HardDrive className="w-3 h-3 text-amber-400" /> NVMe Storage
             </span>
-            <span className="text-xs font-mono font-medium text-text-primary">
+            <HexRivet />
+          </div>
+
+          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">OCCUPIED</span>
+            <span className="text-sm font-mono font-bold text-amber-400 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]">
               {formatBytes(metrics.disk_bytes)}
             </span>
           </div>
-          <div className="w-full bg-surface-elevated rounded-full h-1.5 mt-2.5 overflow-hidden">
-            <div className="bg-status-stopping h-full" style={{ width: '15%' }} />
-          </div>
-        </Card>
 
-        <Card className="p-3.5 bg-surface border-border">
+          <SkeuomorphicLedBar percent={28} color="amber" />
+
+          {/* Drive I/O indicator */}
+          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  serverState === 'running'
+                    ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse'
+                    : 'bg-zinc-700'
+                }`}
+              />
+              <span className="text-zinc-500 uppercase">Drive I/O</span>
+            </div>
+            <span className="text-amber-300 font-semibold">PCIe Gen4</span>
+          </div>
+
+          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
+            <HexRivet />
+            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">SOLID STATE</span>
+            <HexRivet />
+          </div>
+        </div>
+
+        {/* Module 4: Network Bandwidth Dual VU */}
+        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-text-muted flex items-center gap-1.5">
-              <Wifi className="w-3.5 h-3.5 text-status-starting" /> Network
+            <HexRivet />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <Wifi className="w-3 h-3 text-sky-400" /> Transceiver
             </span>
-            <span className="text-xs font-mono font-medium text-text-primary">
-              ↑ {formatBytes(metrics.network.tx_bytes)} &bull; ↓ {formatBytes(metrics.network.rx_bytes)}
-            </span>
+            <HexRivet />
           </div>
-          <div className="flex items-center gap-1.5 mt-2.5">
-            <Circle
-              className={`w-2 h-2 fill-current ${
-                connectionStatus === 'connected'
-                  ? 'text-status-running animate-pulse'
-                  : connectionStatus === 'connecting'
-                  ? 'text-status-starting'
-                  : 'text-status-error'
-              }`}
-            />
-            <span className="text-[10px] text-text-muted font-mono uppercase">
-              {connectionStatus}
-            </span>
+
+          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex flex-col gap-1 font-mono text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-500 flex items-center gap-1"><ArrowUp className="w-2.5 h-2.5 text-sky-400" /> TX</span>
+              <span className="font-bold text-sky-300 drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]">
+                {formatBytes(metrics.network.tx_bytes)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-500 flex items-center gap-1"><ArrowDown className="w-2.5 h-2.5 text-cyan-400" /> RX</span>
+              <span className="font-bold text-cyan-300 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]">
+                {formatBytes(metrics.network.rx_bytes)}
+              </span>
+            </div>
           </div>
-        </Card>
+
+          <SkeuomorphicLedBar percent={35} color="cyan" />
+
+          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
+            <span className="text-zinc-500 uppercase">LINK STATUS</span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected'
+                    ? 'bg-status-running shadow-[0_0_8px_#34d399] animate-pulse'
+                    : 'bg-zinc-700'
+                }`}
+              />
+              <span className="text-zinc-300 uppercase font-semibold text-[9.5px]">
+                {connectionStatus}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
+            <HexRivet />
+            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">10 Gbps SFP+</span>
+            <HexRivet />
+          </div>
+        </div>
+
+        {/* Module 5: System Uptime Chronometer */}
+        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
+          <div className="flex items-center justify-between">
+            <HexRivet />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <Clock className="w-3 h-3 text-purple-400" /> Chronometer
+            </span>
+            <HexRivet />
+          </div>
+
+          {/* Vintage/Modern LCD Digital Stopwatch Bay */}
+          {(() => {
+            const clock = formatDigitalUptime(uptimeMs);
+            return (
+              <div className="bg-[#040608] border border-black shadow-[inset_0_3px_6px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex flex-col items-center justify-center relative overflow-hidden">
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-20"
+                  style={{
+                    background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
+                  }}
+                />
+                <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 font-semibold mb-0.5">
+                  SYSTEM UPTIME
+                </span>
+                <div className="flex items-center gap-1 font-mono font-bold text-base text-purple-400 tracking-wider drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]">
+                  {clock.days > 0 && <span className="text-xs text-purple-300 font-semibold">{clock.days}D</span>}
+                  <span>{clock.hours}</span>
+                  <span className="animate-pulse opacity-80 text-purple-300">:</span>
+                  <span>{clock.mins}</span>
+                  <span className="animate-pulse opacity-80 text-purple-300">:</span>
+                  <span className="text-purple-300">{clock.secs}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <SkeuomorphicLedBar percent={serverState === 'running' ? 70 : 0} color="purple" />
+
+          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
+            <span className="text-zinc-500 uppercase">CONTAINER</span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  serverState === 'running'
+                    ? 'bg-status-running shadow-[0_0_8px_#10b981] animate-pulse'
+                    : serverState === 'starting'
+                    ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b]'
+                    : 'bg-zinc-700'
+                }`}
+              />
+              <span
+                className={`font-semibold uppercase text-[9.5px] ${
+                  serverState === 'running' ? 'text-status-running' : 'text-zinc-400'
+                }`}
+              >
+                {serverState}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
+            <HexRivet />
+            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">TCXO CLOCK</span>
+            <HexRivet />
+          </div>
+        </div>
       </div>
 
       {/* Terminal View */}
