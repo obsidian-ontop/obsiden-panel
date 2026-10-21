@@ -409,6 +409,17 @@ export class ClientServersController {
     return this.pluginsService.getInstalledPlugins(uuid);
   }
 
+  @Get(':uuid/plugins/versions')
+  @UseGuards(ServerAccessGuard)
+  @ApiOperation({ summary: 'List release versions and supported Minecraft versions for a plugin' })
+  async getPluginVersions(
+    @Param('uuid') uuid: string,
+    @Query('source') source: 'spigot' | 'modrinth',
+    @Query('pluginId') pluginId: string,
+  ) {
+    return this.pluginsService.getPluginVersions(uuid, source || 'modrinth', pluginId);
+  }
+
   @Post(':uuid/plugins/install')
   @UseGuards(ServerAccessGuard)
   @RequirePermissions(Permission.FILE_UPDATE)
@@ -419,6 +430,8 @@ export class ClientServersController {
     body: {
       source: 'spigot' | 'modrinth';
       pluginId: string;
+      versionId?: string;
+      mcVersion?: string;
       fileName?: string;
     },
   ) {

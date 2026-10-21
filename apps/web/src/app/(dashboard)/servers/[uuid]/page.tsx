@@ -35,66 +35,34 @@ interface ServerMetrics {
   uptime?: number;
 }
 
-// Corner metallic hex screw/rivet component for skeuomorphic chassis
-function HexRivet() {
-  return (
-    <div className="w-2 h-2 rounded-full bg-gradient-to-br from-zinc-400 via-zinc-600 to-zinc-900 border border-zinc-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-center">
-      <div className="w-[3px] h-[0.75px] bg-zinc-900 rotate-45" />
-    </div>
-  );
-}
-
-// Skeuomorphic discrete 20-segment tactile LED gauge bar
-function SkeuomorphicLedBar({
+// Black Neumorphic recessed track gauge
+function NeumorphicProgressBar({
   percent,
   color = 'cyan',
 }: {
   percent: number;
-  color?: 'cyan' | 'emerald' | 'amber' | 'purple';
+  color?: 'cyan' | 'emerald' | 'amber' | 'purple' | 'sky';
 }) {
-  const totalSegments = 20;
-  const activeSegments = Math.round((Math.max(0, Math.min(100, percent)) / 100) * totalSegments);
+  const clamped = Math.max(0, Math.min(100, percent));
+
+  let glowColor = 'from-cyan-500 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.8)]';
+  if (color === 'emerald') glowColor = 'from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]';
+  if (color === 'amber') glowColor = 'from-amber-500 to-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.8)]';
+  if (color === 'purple') glowColor = 'from-purple-500 to-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.8)]';
+  if (color === 'sky') glowColor = 'from-sky-500 to-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.8)]';
 
   return (
-    <div className="relative p-1 rounded bg-[#06080d] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] overflow-hidden">
-      {/* Subtle glass reflection sheen */}
-      <div className="absolute inset-x-0 top-0 h-[40%] bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
-      <div className="flex items-center gap-[2.5px]">
-        {Array.from({ length: totalSegments }).map((_, idx) => {
-          const isActive = idx < activeSegments;
-          const isWarning = idx >= 14 && idx < 17;
-          const isCritical = idx >= 17;
-
-          let activeStyle = 'bg-[#06b6d4] shadow-[0_0_8px_#06b6d4,inset_0_1px_1px_#a5f3fc]';
-          if (color === 'emerald') activeStyle = 'bg-[#10b981] shadow-[0_0_8px_#10b981,inset_0_1px_1px_#a7f3d0]';
-          if (color === 'amber') activeStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
-          if (color === 'purple') activeStyle = 'bg-[#a855f7] shadow-[0_0_8px_#a855f7,inset_0_1px_1px_#e9d5ff]';
-
-          if (isWarning) activeStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
-          if (isCritical) activeStyle = 'bg-[#ef4444] shadow-[0_0_8px_#ef4444,inset_0_1px_1px_#fecaca]';
-
-          const inactiveStyle = isCritical
-            ? 'bg-[#290d0d]'
-            : isWarning
-            ? 'bg-[#281809]'
-            : 'bg-[#09121c]';
-
-          return (
-            <div
-              key={idx}
-              className={`flex-1 h-2 rounded-[1px] transition-all duration-150 ${
-                isActive ? activeStyle : inactiveStyle
-              }`}
-            />
-          );
-        })}
-      </div>
+    <div className="w-full h-2 rounded-full bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] p-[1.5px] overflow-hidden">
+      <div
+        className={`h-full rounded-full bg-gradient-to-r ${glowColor} transition-all duration-300`}
+        style={{ width: `${clamped}%` }}
+      />
     </div>
   );
 }
 
-// Skeuomorphic CRT Oscilloscope / Telemetry Waveform Display
-function SkeuomorphicOscilloscope({
+// Black Neumorphic Waveform Telemetry Display
+function NeumorphicWaveform({
   points,
   color = '#06b6d4',
 }: {
@@ -104,7 +72,7 @@ function SkeuomorphicOscilloscope({
   const max = Math.max(100, ...points);
   const min = 0;
   const range = max - min || 1;
-  const height = 30;
+  const height = 26;
   const width = 160;
   const step = width / (points.length - 1 || 1);
 
@@ -117,31 +85,14 @@ function SkeuomorphicOscilloscope({
     .join(' ');
 
   return (
-    <div className="relative h-8 w-full rounded bg-[#040608] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95)] overflow-hidden">
-      {/* CRT scanlines effect */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-25 z-10"
-        style={{
-          background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
-        }}
-      />
-      {/* Illuminated Grid lines */}
-      <svg className="absolute inset-0 w-full h-full stroke-cyan-500/10 pointer-events-none" width="100%" height="100%">
-        <line x1="0" y1="33%" x2="100%" y2="33%" strokeDasharray="2,2" />
-        <line x1="0" y1="66%" x2="100%" y2="66%" strokeDasharray="2,2" />
-        <line x1="25%" y1="0" x2="25%" y2="100%" strokeDasharray="2,2" />
-        <line x1="50%" y1="0" x2="50%" y2="100%" strokeDasharray="2,2" />
-        <line x1="75%" y1="0" x2="75%" y2="100%" strokeDasharray="2,2" />
-      </svg>
-      {/* Phosphor wave */}
+    <div className="relative h-7 w-full rounded-lg bg-[#050608] shadow-[inset_2px_2px_5px_#020304,inset_-2px_-2px_5px_#10131a] overflow-hidden flex items-center">
       <svg className="w-full h-full overflow-visible relative z-0" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <path d={pathD} fill="none" stroke={color} strokeWidth="3" opacity="0.35" className="blur-[1.5px]" />
+        <path d={pathD} fill="none" stroke={color} strokeWidth="3" opacity="0.3" className="blur-[1.5px]" />
         <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" />
       </svg>
     </div>
   );
 }
-
 
 /**
  * Cleanly formats and colors raw console stream output:
@@ -170,10 +121,12 @@ function formatConsoleLogs(chunk: string): string {
     return '';
   }
 
-  // 2. Separate squashed lines: match any character that is NOT a newline before a tag/timestamp
+  // 2. Separate conjoined lines: break before timestamps and log prefixes
   formatted = formatted
     // Break before ANY bracket timestamp: [15:50:01 INFO]: or [15:50:01] or [15:50:01.123]
     .replace(/([^\r\n])(\[\d{1,2}:\d{2}:\d{2})/g, '$1\r\n$2')
+    // Break before log level tags [INFO], [WARN], [ERROR]
+    .replace(/([^\r\n])(\[(?:INFO|WARN|WARNING|ERROR|FATAL)\])/gi, '$1\r\n$2')
     // Break before [Pterodactyl Daemon]: or [Wings Daemon]:
     .replace(/([^\r\n])(\[(?:Pterodactyl|Wings) Daemon\]:)/gi, '$1\r\n$2')
     // Break before container shell prompt (container@pterodactyl:~$ or container@pterodactyl~)
@@ -184,9 +137,9 @@ function formatConsoleLogs(chunk: string): string {
     .replace(/([^\r\n])(\*{3,})/g, '$1\r\n$2')
     .replace(/(\*{3,})([^\r\n])/g, '$1\r\n$2')
     // Break before server starting commands or main entry
-    .replace(/([^\r\n])(Starting (?:org\.bukkit|minecraft))/gi, '$1\r\n$2')
+    .replace(/([^\r\n])(Starting (?:org\.bukkit|minecraft|Paper))/gi, '$1\r\n$2')
     // Break before sub-system tags like [ca.spottedleaf... or [bootstrap]
-    .replace(/([^\r\n])(\[[a-zA-Z0-9_\.\-]+\s+[a-zA-Z0-9_\.\-]+\])/gi, '$1\r\n$2')
+    .replace(/([^\r\n])(\[[a-zA-Z0-9_\.\-]+(?:\s+[a-zA-Z0-9_\.\-]+)?\])/g, '$1\r\n$2')
     // Break before Exception in thread
     .replace(/([^\r\n])(Exception in thread)/gi, '$1\r\n$2')
     // Break before stack trace entries (at java.base, at org.bukkit, etc.)
@@ -451,13 +404,25 @@ export default function ServerConsolePage({
               }
               const formatted = formatConsoleLogs(raw);
               if (formatted) {
-                xtermInstance.current?.write(formatted);
+                const lines = formatted.split(/\r?\n/);
+                for (const line of lines) {
+                  if (line.trim().length > 0) {
+                    xtermInstance.current?.writeln(line);
+                  }
+                }
               }
               break;
             }
             case 'install output': {
               const formatted = formatConsoleLogs(payload.args?.[0] || '');
-              xtermInstance.current?.write(formatted);
+              if (formatted) {
+                const lines = formatted.split(/\r?\n/);
+                for (const line of lines) {
+                  if (line.trim().length > 0) {
+                    xtermInstance.current?.writeln(line);
+                  }
+                }
+              }
               break;
             }
             case 'install started':
@@ -669,200 +634,189 @@ export default function ServerConsolePage({
         </div>
       )}
 
-      {/* Skeuomorphic Hardware Instrument Modules */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Module 1: CPU Processor Unit */}
-        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
-          {/* Top Chassis Bezel with Hex Screws */}
-          <div className="flex items-center justify-between">
-            <HexRivet />
-            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              <Cpu className="w-3 h-3 text-cyan-400" /> CPU Core
-            </span>
-            <HexRivet />
-          </div>
+      {/* Pure Black Neumorphic Telemetry & Resource Instrumentation */}
+      {(() => {
+        const cpuLimit = (serverData as any)?.cpu || 100;
+        const cpuPercentOfLimit = Math.min(100, (metrics.cpu_absolute / (cpuLimit || 100)) * 100);
 
-          {/* Recessed VFD Digital Screen */}
-          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">LOAD</span>
-            <span className="text-sm font-mono font-bold text-cyan-400 tracking-tight drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]">
-              {metrics.cpu_absolute.toFixed(1)}%
-            </span>
-          </div>
+        const memLimitBytes = metrics.memory_limit_bytes > 0
+          ? metrics.memory_limit_bytes
+          : ((serverData as any)?.memory || 2048) * 1024 * 1024;
+        const memPercent = memLimitBytes > 0
+          ? Math.min(100, (metrics.memory_bytes / memLimitBytes) * 100)
+          : 0;
 
-          {/* 20-Segment Tactile LED Bar */}
-          <SkeuomorphicLedBar percent={metrics.cpu_absolute} color="cyan" />
+        const diskLimitBytes = ((serverData as any)?.disk || 10240) * 1024 * 1024;
+        const diskPercent = diskLimitBytes > 0
+          ? Math.min(100, (metrics.disk_bytes / diskLimitBytes) * 100)
+          : 0;
 
-          {/* Recessed CRT Oscilloscope Trace */}
-          <div className="pt-0.5">
-            <SkeuomorphicOscilloscope points={cpuHistory} color="#06b6d4" />
-          </div>
+        const totalNetBytes = metrics.network.tx_bytes + metrics.network.rx_bytes;
+        const clock = formatDigitalUptime(uptimeMs);
 
-          {/* Bottom Chassis Bezel with Hex Screws */}
-          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
-            <HexRivet />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">SMP RACK-01</span>
-            <HexRivet />
-          </div>
-        </div>
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {/* Module 1: CPU Processor Unit */}
+            <div className="bg-[#090b0e] border border-white/[0.04] rounded-2xl p-3.5 shadow-[6px_6px_14px_#030406,-6px_-6px_14px_#11141c,inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col justify-between gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5 text-cyan-400" /> CPU Core
+                </span>
+                <span className="text-[9.5px] font-mono text-zinc-500 uppercase px-1.5 py-0.5 rounded-full bg-[#050608] shadow-[inset_1px_1px_2px_#020304,inset_-1px_-1px_2px_#0f1218]">
+                  {cpuLimit}% Limit
+                </span>
+              </div>
 
-        {/* Module 2: Memory Buffer Tank */}
-        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <HexRivet />
-            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              <Activity className="w-3 h-3 text-emerald-400" /> RAM Reservoir
-            </span>
-            <HexRivet />
-          </div>
+              {/* Recessed Neumorphic Readout Bay */}
+              <div className="bg-[#050608] border border-black/80 rounded-xl p-2.5 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">LOAD</span>
+                <span className="text-base font-mono font-bold text-cyan-400 tracking-tight drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]">
+                  {metrics.cpu_absolute.toFixed(1)}%
+                </span>
+              </div>
 
-          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">USED</span>
-            <span className="text-sm font-mono font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]">
-              {formatBytes(metrics.memory_bytes)}
-            </span>
-          </div>
-
-          {/* Memory Fill Percentage */}
-          {(() => {
-            const memPercent =
-              metrics.memory_limit_bytes > 0
-                ? (metrics.memory_bytes / metrics.memory_limit_bytes) * 100
-                : 25;
-            return (
-              <>
-                <SkeuomorphicLedBar percent={memPercent} color="emerald" />
-                <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                  <span className="text-zinc-500 uppercase">Limit:</span>
-                  <span className="text-emerald-300 font-bold">
-                    {metrics.memory_limit_bytes > 0 ? formatBytes(metrics.memory_limit_bytes) : 'UNLIMITED'}
+              <div className="space-y-1">
+                <NeumorphicProgressBar percent={cpuPercentOfLimit} color="cyan" />
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-0.5">
+                  <span className="text-zinc-500">USED / ALLOCATED</span>
+                  <span className="text-cyan-300 font-semibold">
+                    {metrics.cpu_absolute.toFixed(1)}% / {cpuLimit}%
                   </span>
                 </div>
-              </>
-            );
-          })()}
+              </div>
 
-          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
-            <HexRivet />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">DDR5 ECC RAM</span>
-            <HexRivet />
-          </div>
-        </div>
-
-        {/* Module 3: Storage Unit */}
-        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <HexRivet />
-            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              <HardDrive className="w-3 h-3 text-amber-400" /> NVMe Storage
-            </span>
-            <HexRivet />
-          </div>
-
-          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">OCCUPIED</span>
-            <span className="text-sm font-mono font-bold text-amber-400 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]">
-              {formatBytes(metrics.disk_bytes)}
-            </span>
-          </div>
-
-          <SkeuomorphicLedBar percent={28} color="amber" />
-
-          {/* Drive I/O indicator */}
-          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  serverState === 'running'
-                    ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse'
-                    : 'bg-zinc-700'
-                }`}
-              />
-              <span className="text-zinc-500 uppercase">Drive I/O</span>
+              {/* Neumorphic Telemetry Waveform */}
+              <NeumorphicWaveform points={cpuHistory} color="#06b6d4" />
             </div>
-            <span className="text-amber-300 font-semibold">PCIe Gen4</span>
-          </div>
 
-          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
-            <HexRivet />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">SOLID STATE</span>
-            <HexRivet />
-          </div>
-        </div>
+            {/* Module 2: Memory Reservoir */}
+            <div className="bg-[#090b0e] border border-white/[0.04] rounded-2xl p-3.5 shadow-[6px_6px_14px_#030406,-6px_-6px_14px_#11141c,inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col justify-between gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" /> RAM Memory
+                </span>
+                <span className="text-[9.5px] font-mono text-emerald-400 font-bold px-1.5 py-0.5 rounded-full bg-[#050608] shadow-[inset_1px_1px_2px_#020304,inset_-1px_-1px_2px_#0f1218]">
+                  {memPercent.toFixed(0)}%
+                </span>
+              </div>
 
-        {/* Module 4: Network Bandwidth Dual VU */}
-        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <HexRivet />
-            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              <Wifi className="w-3 h-3 text-sky-400" /> Transceiver
-            </span>
-            <HexRivet />
-          </div>
+              <div className="bg-[#050608] border border-black/80 rounded-xl p-2.5 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">USED</span>
+                <span className="text-base font-mono font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]">
+                  {formatBytes(metrics.memory_bytes)}
+                </span>
+              </div>
 
-          <div className="bg-[#05070c] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex flex-col gap-1 font-mono text-[11px]">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 flex items-center gap-1"><ArrowUp className="w-2.5 h-2.5 text-sky-400" /> TX</span>
-              <span className="font-bold text-sky-300 drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]">
-                {formatBytes(metrics.network.tx_bytes)}
-              </span>
+              <div className="space-y-1">
+                <NeumorphicProgressBar percent={memPercent} color="emerald" />
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-0.5">
+                  <span className="text-zinc-500">USED / LIMIT</span>
+                  <span className="text-emerald-300 font-semibold">
+                    {formatBytes(metrics.memory_bytes)} / {formatBytes(memLimitBytes)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#0f1218] flex items-center justify-between text-[9.5px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase">AVAILABLE</span>
+                <span className="text-zinc-300 font-bold">
+                  {formatBytes(Math.max(0, memLimitBytes - metrics.memory_bytes))}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 flex items-center gap-1"><ArrowDown className="w-2.5 h-2.5 text-cyan-400" /> RX</span>
-              <span className="font-bold text-cyan-300 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]">
-                {formatBytes(metrics.network.rx_bytes)}
-              </span>
+
+            {/* Module 3: Storage Disk */}
+            <div className="bg-[#090b0e] border border-white/[0.04] rounded-2xl p-3.5 shadow-[6px_6px_14px_#030406,-6px_-6px_14px_#11141c,inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col justify-between gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5">
+                  <HardDrive className="w-3.5 h-3.5 text-amber-400" /> NVMe Storage
+                </span>
+                <span className="text-[9.5px] font-mono text-amber-400 font-bold px-1.5 py-0.5 rounded-full bg-[#050608] shadow-[inset_1px_1px_2px_#020304,inset_-1px_-1px_2px_#0f1218]">
+                  {diskPercent.toFixed(0)}%
+                </span>
+              </div>
+
+              <div className="bg-[#050608] border border-black/80 rounded-xl p-2.5 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold tracking-wider">OCCUPIED</span>
+                <span className="text-base font-mono font-bold text-amber-400 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]">
+                  {formatBytes(metrics.disk_bytes)}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <NeumorphicProgressBar percent={diskPercent} color="amber" />
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-0.5">
+                  <span className="text-zinc-500">USED / LIMIT</span>
+                  <span className="text-amber-300 font-semibold">
+                    {formatBytes(metrics.disk_bytes)} / {formatBytes(diskLimitBytes)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#0f1218] flex items-center justify-between text-[9.5px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase">AVAILABLE</span>
+                <span className="text-zinc-300 font-bold">
+                  {formatBytes(Math.max(0, diskLimitBytes - metrics.disk_bytes))}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <SkeuomorphicLedBar percent={35} color="cyan" />
+            {/* Module 4: Network Transceiver */}
+            <div className="bg-[#090b0e] border border-white/[0.04] rounded-2xl p-3.5 shadow-[6px_6px_14px_#030406,-6px_-6px_14px_#11141c,inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col justify-between gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Wifi className="w-3.5 h-3.5 text-sky-400" /> Transceiver
+                </span>
+                <div className="flex items-center gap-1 text-[9.5px] font-mono text-zinc-400 px-1.5 py-0.5 rounded-full bg-[#050608] shadow-[inset_1px_1px_2px_#020304,inset_-1px_-1px_2px_#0f1218]">
+                  <span className={`w-1.5 h-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-status-running animate-pulse' : 'bg-zinc-600'}`} />
+                  <span className="uppercase">{connectionStatus}</span>
+                </div>
+              </div>
 
-          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
-            <span className="text-zinc-500 uppercase">LINK STATUS</span>
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  connectionStatus === 'connected'
-                    ? 'bg-status-running shadow-[0_0_8px_#34d399] animate-pulse'
-                    : 'bg-zinc-700'
-                }`}
-              />
-              <span className="text-zinc-300 uppercase font-semibold text-[9.5px]">
-                {connectionStatus}
-              </span>
+              <div className="bg-[#050608] border border-black/80 rounded-xl p-2.5 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] flex flex-col gap-1 font-mono text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500 flex items-center gap-1"><ArrowUp className="w-2.5 h-2.5 text-sky-400" /> TX OUT</span>
+                  <span className="font-bold text-sky-300">
+                    {formatBytes(metrics.network.tx_bytes)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500 flex items-center gap-1"><ArrowDown className="w-2.5 h-2.5 text-cyan-400" /> RX IN</span>
+                  <span className="font-bold text-cyan-300">
+                    {formatBytes(metrics.network.rx_bytes)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <NeumorphicProgressBar percent={serverState === 'running' ? 35 : 0} color="sky" />
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-0.5">
+                  <span className="text-zinc-500">TOTAL TRANSFERRED</span>
+                  <span className="text-sky-300 font-semibold">{formatBytes(totalNetBytes)}</span>
+                </div>
+              </div>
+
+              <div className="p-2 rounded-lg bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#0f1218] flex items-center justify-between text-[9.5px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase">CHANNEL</span>
+                <span className="text-zinc-300 font-bold">WINGS WEBSOCKET</span>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
-            <HexRivet />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">10 Gbps SFP+</span>
-            <HexRivet />
-          </div>
-        </div>
+            {/* Module 5: System Chronometer / Uptime */}
+            <div className="bg-[#090b0e] border border-white/[0.04] rounded-2xl p-3.5 shadow-[6px_6px_14px_#030406,-6px_-6px_14px_#11141c,inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col justify-between gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-purple-400" /> Chronometer
+                </span>
+                <span className="text-[9.5px] font-mono text-purple-400 font-bold px-1.5 py-0.5 rounded-full bg-[#050608] shadow-[inset_1px_1px_2px_#020304,inset_-1px_-1px_2px_#0f1218]">
+                  UPTIME
+                </span>
+              </div>
 
-        {/* Module 5: System Uptime Chronometer */}
-        <div className="bg-gradient-to-b from-[#181d27] via-[#121620] to-[#0a0d13] border border-white/10 shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-3 relative overflow-hidden flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <HexRivet />
-            <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              <Clock className="w-3 h-3 text-purple-400" /> Chronometer
-            </span>
-            <HexRivet />
-          </div>
-
-          {/* Vintage/Modern LCD Digital Stopwatch Bay */}
-          {(() => {
-            const clock = formatDigitalUptime(uptimeMs);
-            return (
-              <div className="bg-[#040608] border border-black shadow-[inset_0_3px_6px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] rounded-md p-2 flex flex-col items-center justify-center relative overflow-hidden">
-                <div
-                  className="absolute inset-0 pointer-events-none opacity-20"
-                  style={{
-                    background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
-                  }}
-                />
+              {/* Digital LCD Clock Well */}
+              <div className="bg-[#050608] border border-black/80 rounded-xl p-2.5 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] flex flex-col items-center justify-center">
                 <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 font-semibold mb-0.5">
-                  SYSTEM UPTIME
+                  ELAPSED TIME
                 </span>
                 <div className="flex items-center gap-1 font-mono font-bold text-base text-purple-400 tracking-wider drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]">
                   {clock.days > 0 && <span className="text-xs text-purple-300 font-semibold">{clock.days}D</span>}
@@ -873,40 +827,28 @@ export default function ServerConsolePage({
                   <span className="text-purple-300">{clock.secs}</span>
                 </div>
               </div>
-            );
-          })()}
 
-          <SkeuomorphicLedBar percent={serverState === 'running' ? 70 : 0} color="purple" />
+              <div className="space-y-1">
+                <NeumorphicProgressBar percent={serverState === 'running' ? 100 : 0} color="purple" />
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 px-0.5">
+                  <span className="text-zinc-500">CONTAINER</span>
+                  <span className={`font-semibold uppercase ${serverState === 'running' ? 'text-status-running' : 'text-zinc-400'}`}>
+                    {serverState}
+                  </span>
+                </div>
+              </div>
 
-          <div className="p-1.5 rounded bg-[#05070c] border border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] flex items-center justify-between text-[10px] font-mono text-zinc-400">
-            <span className="text-zinc-500 uppercase">CONTAINER</span>
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  serverState === 'running'
-                    ? 'bg-status-running shadow-[0_0_8px_#10b981] animate-pulse'
-                    : serverState === 'starting'
-                    ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b]'
-                    : 'bg-zinc-700'
-                }`}
-              />
-              <span
-                className={`font-semibold uppercase text-[9.5px] ${
-                  serverState === 'running' ? 'text-status-running' : 'text-zinc-400'
-                }`}
-              >
-                {serverState}
-              </span>
+              <div className="p-2 rounded-lg bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#0f1218] flex items-center justify-between text-[9.5px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase">SERVER STATE</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${serverState === 'running' ? 'bg-status-running shadow-[0_0_6px_#10b981] animate-pulse' : 'bg-zinc-600'}`} />
+                  <span className="text-zinc-300 font-bold uppercase">{serverState === 'running' ? 'ONLINE' : 'OFFLINE'}</span>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div className="flex items-center justify-between pt-0.5 border-t border-white/[0.04]">
-            <HexRivet />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">TCXO CLOCK</span>
-            <HexRivet />
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Terminal View */}
       <div className="bg-surface border border-border rounded-card overflow-hidden shadow-2xl">

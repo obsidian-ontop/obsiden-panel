@@ -26,53 +26,27 @@ import { Button } from '../../../../components/ui/button';
 import { Badge } from '../../../../components/ui/badge';
 import { formatMemory } from '../../../../lib/utils';
 
-// Corner metallic hex screw/rivet component for skeuomorphic server chassis
-function HexRivet() {
-  return (
-    <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-zinc-300 via-zinc-600 to-zinc-900 border border-zinc-700/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-center">
-      <div className="w-[4px] h-[0.75px] bg-zinc-900 rotate-45" />
-    </div>
-  );
-}
-
-// Skeuomorphic discrete multi-segment tactile LED bar for nodes
-function SkeuomorphicNodeBar({
+// Black Neumorphic progress bar for nodes
+function NeumorphicNodeProgressBar({
   percent,
   color = 'cyan',
 }: {
   percent: number;
   color?: 'cyan' | 'amber' | 'emerald' | 'purple';
 }) {
-  const total = 16;
-  const active = Math.round((Math.max(0, Math.min(100, percent)) / 100) * total);
+  const clamped = Math.max(0, Math.min(100, percent));
+
+  let glowColor = 'from-cyan-500 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.8)]';
+  if (color === 'emerald') glowColor = 'from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]';
+  if (color === 'amber') glowColor = 'from-amber-500 to-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.8)]';
+  if (color === 'purple') glowColor = 'from-purple-500 to-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.8)]';
 
   return (
-    <div className="relative p-1 rounded bg-[#06080d] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-[35%] bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
-      <div className="flex items-center gap-[2.5px]">
-        {Array.from({ length: total }).map((_, idx) => {
-          const isLit = idx < active;
-          const isWarning = idx >= 11 && idx < 14;
-          const isCritical = idx >= 14;
-
-          let litStyle = 'bg-[#06b6d4] shadow-[0_0_8px_#06b6d4,inset_0_1px_1px_#a5f3fc]';
-          if (color === 'emerald') litStyle = 'bg-[#10b981] shadow-[0_0_8px_#10b981,inset_0_1px_1px_#a7f3d0]';
-          if (color === 'amber') litStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
-          if (color === 'purple') litStyle = 'bg-[#a855f7] shadow-[0_0_8px_#a855f7,inset_0_1px_1px_#e9d5ff]';
-
-          if (isWarning) litStyle = 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b,inset_0_1px_1px_#fde68a]';
-          if (isCritical) litStyle = 'bg-[#ef4444] shadow-[0_0_8px_#ef4444,inset_0_1px_1px_#fecaca]';
-
-          const unlitStyle = isCritical ? 'bg-[#290d0d]' : isWarning ? 'bg-[#281809]' : 'bg-[#09121c]';
-
-          return (
-            <div
-              key={idx}
-              className={`flex-1 h-2 rounded-[1px] transition-all duration-150 ${isLit ? litStyle : unlitStyle}`}
-            />
-          );
-        })}
-      </div>
+    <div className="w-full h-2 rounded-full bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] p-[1.5px] overflow-hidden">
+      <div
+        className={`h-full rounded-full bg-gradient-to-r ${glowColor} transition-all duration-300`}
+        style={{ width: `${clamped}%` }}
+      />
     </div>
   );
 }
@@ -785,17 +759,17 @@ export default function AdminNodesPage() {
           {nodes?.map((node) => (
             <div
               key={node.id}
-              className="bg-gradient-to-b from-[#1c222d] via-[#141821] to-[#0c0f16] border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15),inset_0_-1px_0_rgba(0,0,0,0.8)] rounded-card p-5 relative overflow-hidden flex flex-col justify-between gap-4"
+              className="bg-[#090b0f] border border-white/[0.04] rounded-2xl p-5 shadow-[6px_6px_16px_#030406,-6px_-6px_16px_#12151d,inset_0_1px_0_rgba(255,255,255,0.03)] flex flex-col justify-between gap-4.5 relative overflow-hidden"
             >
-              {/* Top Faceplate Header with Screws */}
+              {/* Top Neumorphic Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-md bg-[#070a10] border border-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.08)] flex items-center justify-center text-primary">
+                  <div className="w-10 h-10 rounded-xl bg-[#050608] shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] border border-black/80 flex items-center justify-center text-primary">
                     <Server className="w-5 h-5 drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2.5">
-                      <h3 className="text-sm font-bold font-mono tracking-tight text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      <h3 className="text-sm font-bold font-mono tracking-tight text-text-primary">
                         {node.name}
                       </h3>
                       <NodeHeartbeatBadge nodeId={node.id} />
@@ -806,26 +780,26 @@ export default function AdminNodesPage() {
                   </div>
                 </div>
 
-                {/* Tactile Hardware Action Buttons */}
+                {/* Black Neumorphic Action Buttons */}
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setAllocationsNodeId(node.id)}
                     title="Manage Port Allocations for this Node"
-                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
+                    className="px-2.5 py-1.5 rounded-xl bg-[#0c0e14] border border-white/[0.04] text-text-secondary hover:text-text-primary shadow-[3px_3px_6px_#030406,-3px_-3px_6px_#12151d] active:shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
                     <Network className="w-3.5 h-3.5 text-primary" /> Allocations
                   </button>
                   <button
                     onClick={() => testConnMutation.mutate(node.id)}
                     title="Test authenticated connection to Wings daemon"
-                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
+                    className="px-2.5 py-1.5 rounded-xl bg-[#0c0e14] border border-white/[0.04] text-text-secondary hover:text-text-primary shadow-[3px_3px_6px_#030406,-3px_-3px_6px_#12151d] active:shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-emerald-400" /> Test
                   </button>
                   <button
                     onClick={() => setConfigNodeId(node.id)}
                     title="View Wings config.yml"
-                    className="px-2.5 py-1 rounded bg-gradient-to-b from-[#222938] to-[#141824] border border-white/10 hover:border-primary/50 text-text-secondary hover:text-text-primary shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
+                    className="px-2.5 py-1.5 rounded-xl bg-[#0c0e14] border border-white/[0.04] text-text-secondary hover:text-text-primary shadow-[3px_3px_6px_#030406,-3px_-3px_6px_#12151d] active:shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] text-xs font-mono font-medium flex items-center gap-1.5 transition-all"
                   >
                     <FileCode className="w-3.5 h-3.5 text-sky-400" /> Config
                   </button>
@@ -835,7 +809,7 @@ export default function AdminNodesPage() {
                         deleteMutation.mutate(node.id);
                       }
                     }}
-                    className="p-1.5 rounded bg-gradient-to-b from-[#2a1719] to-[#1a0f11] border border-rose-500/20 text-zinc-400 hover:text-rose-400 shadow-[0_2px_4px_rgba(0,0,0,0.5)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] transition-colors"
+                    className="p-1.5 rounded-xl bg-[#0c0e14] border border-rose-500/10 text-zinc-400 hover:text-rose-400 shadow-[3px_3px_6px_#030406,-3px_-3px_6px_#12151d] active:shadow-[inset_2px_2px_4px_#020304,inset_-2px_-2px_4px_#10131a] transition-colors"
                     title="Delete Node"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -843,10 +817,10 @@ export default function AdminNodesPage() {
                 </div>
               </div>
 
-              {/* Skeuomorphic Resource Allocation Gauges */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-white/[0.06]">
+              {/* Neumorphic Resource Allocation Gauges with Exact Utilization */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                 {/* Memory Allocation Gauge */}
-                <div className="p-3 rounded-md bg-[#07090e] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] space-y-2">
+                <div className="p-3.5 rounded-xl bg-[#050608] border border-black/80 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-mono">
                     <span className="text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Activity className="w-3 h-3 text-cyan-400" /> Memory Pool
@@ -855,17 +829,20 @@ export default function AdminNodesPage() {
                       {Math.round(node.stats.memoryUsagePercent)}%
                     </span>
                   </div>
-                  <SkeuomorphicNodeBar percent={node.stats.memoryUsagePercent} color="cyan" />
-                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                    <span>ALLOCATED</span>
-                    <span className="text-zinc-300 font-bold">
+                  <NeumorphicNodeProgressBar percent={node.stats.memoryUsagePercent} color="cyan" />
+                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-0.5">
+                    <span className="text-zinc-500">USED / LIMIT</span>
+                    <span className="text-cyan-300 font-bold">
                       {formatMemory(node.stats.allocatedMemory)} / {formatMemory(node.memory)}
                     </span>
+                  </div>
+                  <div className="text-[9.5px] font-mono text-zinc-500 text-right">
+                    Remaining: <span className="text-zinc-300">{formatMemory(Math.max(0, node.memory - node.stats.allocatedMemory))}</span>
                   </div>
                 </div>
 
                 {/* Disk Allocation Gauge */}
-                <div className="p-3 rounded-md bg-[#07090e] border border-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.06)] space-y-2">
+                <div className="p-3.5 rounded-xl bg-[#050608] border border-black/80 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-mono">
                     <span className="text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                       <HardDrive className="w-3 h-3 text-amber-400" /> Storage Pool
@@ -874,39 +851,36 @@ export default function AdminNodesPage() {
                       {Math.round(node.stats.diskUsagePercent)}%
                     </span>
                   </div>
-                  <SkeuomorphicNodeBar percent={node.stats.diskUsagePercent} color="amber" />
-                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                    <span>ALLOCATED</span>
-                    <span className="text-zinc-300 font-bold">
+                  <NeumorphicNodeProgressBar percent={node.stats.diskUsagePercent} color="amber" />
+                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-0.5">
+                    <span className="text-zinc-500">USED / LIMIT</span>
+                    <span className="text-amber-300 font-bold">
                       {formatMemory(node.stats.allocatedDisk)} / {formatMemory(node.disk)}
                     </span>
+                  </div>
+                  <div className="text-[9.5px] font-mono text-zinc-500 text-right">
+                    Remaining: <span className="text-zinc-300">{formatMemory(Math.max(0, node.disk - node.stats.allocatedDisk))}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Skeuomorphic Real-time Telemetry Spectrum Analyzer */}
-              <div className="p-3 rounded-md bg-[#05070c] border border-black shadow-[inset_0_3px_6px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.06)] relative overflow-hidden">
-                <div
-                  className="absolute inset-0 pointer-events-none opacity-20 z-10"
-                  style={{
-                    background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0.8) 1px, transparent 1px, transparent 2px)',
-                  }}
-                />
+              {/* Neumorphic Live Telemetry Activity Spectrum */}
+              <div className="p-3 rounded-xl bg-[#050608] border border-black/80 shadow-[inset_3px_3px_6px_#020304,inset_-3px_-3px_6px_#0f1218] relative overflow-hidden">
                 <div className="flex items-center justify-between text-[10.5px] font-mono mb-2 relative z-20">
                   <span className="text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 font-bold">
                     <Activity className="w-3 h-3 text-emerald-400" /> Daemon Telemetry Analyzer
                   </span>
-                  <span className="text-[10px] text-zinc-500 uppercase">12s Pulse</span>
+                  <span className="text-[10px] text-zinc-500 uppercase">12s Polling Pulse</span>
                 </div>
 
-                <div className="h-10 w-full flex items-end gap-1.5 pt-1 relative z-20">
+                <div className="h-8 w-full flex items-end gap-1.5 pt-1 relative z-20">
                   {[25, 45, 30, 60, 40, 75, 50, Math.round(node.stats.memoryUsagePercent || 15), Math.round(node.stats.diskUsagePercent || 10)].map((val, idx) => (
                     <div
                       key={idx}
                       className="flex-1 flex flex-col justify-end gap-[1px] h-full"
                     >
                       <div
-                        className="w-full rounded-[1px] transition-all duration-500 bg-emerald-400 shadow-[0_0_8px_#10b981]"
+                        className="w-full rounded-full transition-all duration-500 bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-[0_0_8px_#10b981]"
                         style={{ height: `${Math.max(15, Math.min(val, 100))}%` }}
                       />
                     </div>
@@ -914,21 +888,19 @@ export default function AdminNodesPage() {
                 </div>
               </div>
 
-              {/* Bottom Chassis Details Bar with Hex Screws */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-[11px] font-mono text-zinc-400">
+              {/* Bottom Chassis Details Bar */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-[11px] font-mono text-zinc-400">
                 <div className="flex items-center gap-2">
-                  <HexRivet />
-                  <span>SERVERS: <strong className="text-text-primary">{node.stats.totalServers}</strong></span>
+                  <span>HOSTED SERVERS: <strong className="text-text-primary">{node.stats.totalServers}</strong></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span>PORTS: <strong className="text-text-primary">{node.stats.totalAllocations}</strong></span>
+                  <span>ALLOCATED: <strong className="text-text-primary">{node.stats.allocatedPorts} / {node.stats.totalAllocations}</strong> Ports</span>
                   <button
                     onClick={() => setAllocationsNodeId(node.id)}
                     className="text-primary hover:underline font-semibold"
                   >
                     (Manage)
                   </button>
-                  <HexRivet />
                 </div>
               </div>
             </div>

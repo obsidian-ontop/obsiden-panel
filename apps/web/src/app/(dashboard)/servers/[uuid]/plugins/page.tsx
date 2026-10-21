@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Sliders,
+  X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../../../../components/ui/card';
 import { Button } from '../../../../../components/ui/button';
@@ -42,6 +44,18 @@ interface PluginItem {
   premium: boolean;
 }
 
+interface PluginVersionOption {
+  id: string;
+  name: string;
+  versionNumber: string;
+  gameVersions: string[];
+  loaders: string[];
+  downloadUrl: string;
+  fileName: string;
+  size: number;
+  releaseDate: string;
+}
+
 interface InstalledPlugin {
   name: string;
   size: number;
@@ -62,6 +76,7 @@ export default function ServerPluginsPage({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [page, setPage] = useState(1);
   const [installingId, setInstallingId] = useState<string | null>(null);
+  const [versionModalPlugin, setVersionModalPlugin] = useState<PluginItem | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Debounce search
@@ -98,22 +113,43 @@ export default function ServerPluginsPage({
     staleTime: 60 * 1000,
   });
 
-  // Install plugin mutation
+  // Fetch version options for currently opened modal plugin
+  const { data: pluginVersions = [], isLoading: isVersionsLoading } = useQuery<PluginVersionOption[]>({
+    queryKey: ['plugin-versions', uuid, versionModalPlugin?.source, versionModalPlugin?.pluginId],
+    queryFn: () => {
+      if (!versionModalPlugin) return [];
+      return fetchApi<PluginVersionOption[]>(
+        `/api/client/servers/${uuid}/plugins/versions?source=${versionModalPlugin.source}&pluginId=${versionModalPlugin.pluginId}`,
+      );
+    },
+    enabled: Boolean(versionModalPlugin),
+  });
+
+  // Install plugin mutation with Minecraft version support
   const installMutation = useMutation({
-    mutationFn: (plugin: PluginItem) =>
+    mutationFn: (payload: {
+      plugin: PluginItem;
+      versionId?: string;
+      mcVersion?: string;
+      fileName?: string;
+    }) =>
       fetchApi(`/api/client/servers/${uuid}/plugins/install`, {
         method: 'POST',
         body: JSON.stringify({
-          source: plugin.source,
-          pluginId: plugin.pluginId,
+          source: payload.plugin.source,
+          pluginId: payload.plugin.pluginId,
+          versionId: payload.versionId,
+          mcVersion: payload.mcVersion || '1.21.8',
+          fileName: payload.fileName,
         }),
       }),
-    onSuccess: (data: any, plugin) => {
+    onSuccess: (data: any, variables) => {
       setFeedback({
         type: 'success',
-        message: data?.message || `Plugin "${plugin.name}" installed successfully!`,
+        message: data?.message || `Plugin "${variables.plugin.name}" installed successfully!`,
       });
       setInstallingId(null);
+      setVersionModalPlugin(null);
       queryClient.invalidateQueries({ queryKey: ['server-plugins-installed', uuid] });
       queryClient.invalidateQueries({ queryKey: ['server-files', uuid] });
     },
@@ -161,10 +197,16 @@ export default function ServerPluginsPage({
     },
   });
 
-  const handleInstall = (plugin: PluginItem) => {
+  const handleInstall = (
+    plugin: PluginItem,
+    options?: { versionId?: string; mcVersion?: string; fileName?: string },
+  ) => {
     setFeedback(null);
     setInstallingId(plugin.id);
-    installMutation.mutate(plugin);
+    installMutation.mutate({
+      plugin,
+      ...options,
+    });
   };
 
   const isPluginInstalled = (plugin: PluginItem) => {
@@ -475,6 +517,30 @@ export default function ServerPluginsPage({
                       <p className="text-[11px] text-text-secondary mt-2.5 line-clamp-2 leading-relaxed">
                         {plugin.tagline || 'Essential Minecraft server enhancement plugin.'}
                       </p>
+
+                      {/* Supported Minecraft Versions Tags */}
+                      {plugin.testedVersions && plugin.testedVersions.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-2.5 pt-2 border-t border-border/40">
+                          <span className="text-[10px] text-text-muted font-mono">Supports MC:</span>
+                          {plugin.testedVersions.slice(0, 5).map((v) => (
+                            <span
+                              key={v}
+                              className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded ${
+                                v === '1.21.8' || v.startsWith('1.21')
+                                  ? 'bg-status-running/15 text-status-running border border-status-running/30 font-bold'
+                                  : 'bg-surface-elevated text-text-muted border border-border'
+                              }`}
+                            >
+                              {v}
+                            </span>
+                          ))}
+                          {plugin.testedVersions.length > 5 && (
+                            <span className="text-[9px] text-text-muted font-mono">
+                              +{plugin.testedVersions.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom: Stats & Action Button */}
@@ -501,6 +567,18 @@ export default function ServerPluginsPage({
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
 
+                        {/* Choose Specific Version Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setVersionModalPlugin(plugin)}
+                          className="h-7 px-2 text-[10.5px] font-mono text-text-muted hover:text-text-primary gap-1"
+                          title="Choose specific Minecraft version release"
+                        >
+                          <Sliders className="w-3 h-3 text-primary" />
+                          Versions
+                        </Button>
+
                         {isInstalled ? (
                           <Badge variant="outline" className="border-status-running/40 text-status-running text-[10px] gap-1 py-0.5 px-2">
                             <Check className="w-3 h-3" /> Installed
@@ -509,9 +587,10 @@ export default function ServerPluginsPage({
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => handleInstall(plugin)}
+                            onClick={() => handleInstall(plugin, { mcVersion: '1.21.8' })}
                             disabled={isCurrentlyInstalling || installMutation.isPending}
                             className="h-7 px-2.5 text-[11px] font-semibold gap-1 border-border hover:border-primary hover:text-primary transition-all"
+                            title="1-Click Install latest version compatible with Minecraft 1.21.8"
                           >
                             {isCurrentlyInstalling ? (
                               <>
@@ -521,7 +600,7 @@ export default function ServerPluginsPage({
                             ) : (
                               <>
                                 <Download className="w-3 h-3" />
-                                <span>Install</span>
+                                <span>Install (1.21.8)</span>
                               </>
                             )}
                           </Button>
@@ -560,6 +639,143 @@ export default function ServerPluginsPage({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Version Selection Modal */}
+      {versionModalPlugin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-xl bg-surface border border-border rounded-card p-5 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-control bg-primary/10 text-primary border border-primary/20">
+                  <Puzzle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary">
+                    Select Version &mdash; {versionModalPlugin.name}
+                  </h3>
+                  <p className="text-[11px] text-text-muted font-mono">
+                    Target Server Version: <span className="text-status-running font-bold">Minecraft 1.21.8</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setVersionModalPlugin(null)}
+                className="text-text-muted hover:text-text-primary"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Releases List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px]">
+              {isVersionsLoading ? (
+                <div className="p-12 text-center text-xs text-text-muted flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+                  <span>Loading releases and Minecraft compatibility tags...</span>
+                </div>
+              ) : pluginVersions.length === 0 ? (
+                <div className="p-8 text-center text-xs text-text-muted">
+                  No individual releases listed. You can use the direct 1-click Install button.
+                </div>
+              ) : (
+                pluginVersions.map((ver) => {
+                  const supportsTarget =
+                    ver.gameVersions.includes('1.21.8') ||
+                    ver.gameVersions.some((gv) => gv.startsWith('1.21'));
+                  const isInstallingThis =
+                    installingId === `${versionModalPlugin.id}:${ver.id}`;
+
+                  return (
+                    <div
+                      key={ver.id}
+                      className={`p-3 rounded-control border flex items-center justify-between gap-3 transition-colors ${
+                        supportsTarget
+                          ? 'bg-status-running/5 border-status-running/30 hover:border-status-running/60'
+                          : 'bg-surface-elevated/40 border-border hover:border-border-hover'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-text-primary">
+                            {ver.name || `v${ver.versionNumber}`}
+                          </span>
+                          {supportsTarget && (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-status-running/20 text-status-running border border-status-running/30">
+                              ✓ 1.21.8 Compatible
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Supported MC versions row */}
+                        <div className="flex flex-wrap items-center gap-1 mt-1 text-[10px] font-mono text-text-muted">
+                          <span>MC:</span>
+                          {ver.gameVersions.slice(0, 6).map((gv) => (
+                            <span
+                              key={gv}
+                              className={`px-1 py-0.2 rounded ${
+                                gv === '1.21.8' || gv.startsWith('1.21')
+                                  ? 'bg-status-running/20 text-status-running font-bold'
+                                  : 'bg-surface text-text-secondary'
+                              }`}
+                            >
+                              {gv}
+                            </span>
+                          ))}
+                          {ver.gameVersions.length > 6 && (
+                            <span>+{ver.gameVersions.length - 6} more</span>
+                          )}
+                          {ver.size > 0 && (
+                            <span className="opacity-70">&bull; {formatBytes(ver.size)}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant={supportsTarget ? 'primary' : 'secondary'}
+                        disabled={installMutation.isPending}
+                        onClick={() => {
+                          setInstallingId(`${versionModalPlugin.id}:${ver.id}`);
+                          handleInstall(versionModalPlugin, {
+                            versionId: ver.id,
+                            fileName: ver.fileName,
+                          });
+                        }}
+                        className="h-7 px-3 text-xs gap-1 shrink-0 font-semibold"
+                      >
+                        {isInstallingThis ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>Installing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3 h-3" />
+                            <span>Install</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <span className="text-[11px] text-text-muted">
+                {pluginVersions.length} versions available
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setVersionModalPlugin(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

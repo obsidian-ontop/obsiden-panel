@@ -19,6 +19,18 @@ export interface PluginItem {
   premium: boolean;
 }
 
+export interface PluginVersionOption {
+  id: string;
+  name: string;
+  versionNumber: string;
+  gameVersions: string[];
+  loaders: string[];
+  downloadUrl: string;
+  fileName: string;
+  size: number;
+  releaseDate: string;
+}
+
 export interface InstalledPlugin {
   name: string;
   size: number;
@@ -45,6 +57,74 @@ export class PluginsService {
       daemonListen: node.daemonPort,
       daemonToken: node.daemonToken,
     });
+  }
+
+  /**
+   * Fetch specific release versions for a plugin (showing Minecraft versions it was built for).
+   */
+  async getPluginVersions(
+    serverUuid: string,
+    source: 'spigot' | 'modrinth',
+    pluginId: string,
+  ): Promise<PluginVersionOption[]> {
+    const headers = { 'User-Agent': this.userAgent, Accept: 'application/json' };
+
+    if (source === 'modrinth') {
+      try {
+        const res = await fetch(`https://api.modrinth.com/v2/project/${pluginId}/version`, { headers });
+        if (!res.ok) return [];
+        const versions = await res.json();
+        if (!Array.isArray(versions)) return [];
+
+        return versions
+          .map((v: any) => {
+            const primaryFile = v.files?.find((f: any) => f.primary) || v.files?.[0];
+            return {
+              id: v.id,
+              name: v.name || `Release ${v.version_number}`,
+              versionNumber: v.version_number,
+              gameVersions: Array.isArray(v.game_versions) ? v.game_versions : [],
+              loaders: Array.isArray(v.loaders) ? v.loaders : [],
+              downloadUrl: primaryFile?.url || '',
+              fileName: primaryFile?.filename || `${v.version_number}.jar`,
+              size: primaryFile?.size || 0,
+              releaseDate: v.date_published || '',
+            };
+          })
+          .filter((v) => Boolean(v.downloadUrl));
+      } catch (err: any) {
+        this.logger.warn(`Failed to fetch Modrinth versions: ${err.message}`);
+        return [];
+      }
+    }
+
+    if (source === 'spigot') {
+      try {
+        const res = await fetch(`https://api.spiget.org/v2/resources/${pluginId}/versions?size=25&sort=-releaseDate`, {
+          headers,
+        });
+        if (!res.ok) return [];
+        const versions = await res.json();
+        if (!Array.isArray(versions)) return [];
+
+        return versions.map((v: any) => ({
+          id: String(v.id),
+          name: `Version ${v.name}`,
+          versionNumber: v.name,
+          gameVersions: [],
+          loaders: ['spigot', 'paper', 'bukkit'],
+          downloadUrl: `https://api.spiget.org/v2/resources/${pluginId}/download`,
+          fileName: `spigot-${pluginId}-${v.name}.jar`,
+          size: 0,
+          releaseDate: v.releaseDate ? new Date(v.releaseDate * 1000).toISOString() : '',
+        }));
+      } catch (err: any) {
+        this.logger.warn(`Failed to fetch Spigot versions: ${err.message}`);
+        return [];
+      }
+    }
+
+    return [];
   }
 
   /**
@@ -108,7 +188,7 @@ export class PluginsService {
         const offset = (page - 1) * modrinthLimit;
         const modrinthUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(
           q,
-        )}&facets=[[%22project_type:plugin%22]]&limit=${modrinthLimit}&offset=${offset}`;
+        )}&facets=[[%22project_type:plugin%22]]&index=downloads&limit=${modrinthLimit}&offset=${offset}`;
 
         const modRes = await fetch(modrinthUrl, { headers });
         if (modRes.ok) {
@@ -116,6 +196,14 @@ export class PluginsService {
           if (modData?.hits && Array.isArray(modData.hits)) {
             modrinthTotal = modData.total_hits || modData.hits.length;
             for (const item of modData.hits) {
+              // Extract clean Minecraft versions
+              let parsedVersions: string[] = [];
+              if (Array.isArray(item.versions)) {
+                parsedVersions = item.versions.filter((v: string) => /^\d+\.\d+/.test(v));
+              } else if (typeof item.versions === 'string') {
+                parsedVersions = item.versions.split(' ').filter((v: string) => /^\d+\.\d+/.test(v));
+              }
+
               results.push({
                 id: `modrinth:${item.project_id}`,
                 pluginId: item.project_id,
@@ -126,7 +214,7 @@ export class PluginsService {
                 downloads: item.downloads || 0,
                 rating: item.follows ? Math.min(5, Math.round((item.follows / 50) * 10) / 10 + 3.5) : 4.8,
                 iconUrl: item.icon_url || null,
-                testedVersions: item.versions ? item.versions.split(' ').slice(0, 5) : [],
+                testedVersions: parsedVersions.slice(0, 8),
                 sourceUrl: `https://modrinth.com/plugin/${item.slug || item.project_id}`,
                 premium: false,
               });
@@ -183,13 +271,15 @@ export class PluginsService {
   }
 
   /**
-   * Install a plugin directly into /plugins on the server.
+   * Install a plugin directly into /plugins on the server with target version / Minecraft version support.
    */
   async installPlugin(
     serverUuid: string,
     dto: {
       source: 'spigot' | 'modrinth';
       pluginId: string;
+      versionId?: string;
+      mcVersion?: string;
       fileName?: string;
     },
   ): Promise<{ success: boolean; fileName: string; message: string }> {
@@ -232,7 +322,7 @@ export class PluginsService {
       }
       downloadUrl = `https://api.spiget.org/v2/resources/${dto.pluginId}/download`;
     } else if (dto.source === 'modrinth') {
-      // Fetch latest version download from Modrinth
+      // Fetch versions list from Modrinth to find best compatible build
       const verRes = await fetch(
         `https://api.modrinth.com/v2/project/${dto.pluginId}/version`,
         { headers: { 'User-Agent': this.userAgent } },
@@ -241,11 +331,42 @@ export class PluginsService {
         throw new BadRequestException('Failed to find compatible version on Modrinth');
       }
       const versions = await verRes.json();
-      if (!Array.isArray(versions) || versions.length === 0 || !versions[0]?.files?.[0]?.url) {
+      if (!Array.isArray(versions) || versions.length === 0) {
         throw new BadRequestException('No downloadable JAR file found for this Modrinth plugin');
       }
 
-      const fileObj = versions[0].files[0];
+      let matchedVersion: any = null;
+
+      // 1. If explicit versionId requested
+      if (dto.versionId) {
+        matchedVersion = versions.find((v: any) => v.id === dto.versionId);
+      }
+
+      // 2. If target Minecraft version requested (e.g. 1.21.8)
+      if (!matchedVersion && dto.mcVersion) {
+        const cleanMc = dto.mcVersion.trim();
+        // Exact match
+        matchedVersion = versions.find((v: any) => v.game_versions?.includes(cleanMc));
+
+        // Major.minor match (e.g. 1.21.8 matches 1.21.x)
+        if (!matchedVersion && cleanMc.includes('.')) {
+          const majorMinor = cleanMc.split('.').slice(0, 2).join('.');
+          matchedVersion = versions.find((v: any) =>
+            v.game_versions?.some((gv: string) => gv.startsWith(majorMinor)),
+          );
+        }
+      }
+
+      // 3. Fallback to latest version with a valid JAR file
+      if (!matchedVersion) {
+        matchedVersion = versions.find((v: any) => v.files?.[0]?.url) || versions[0];
+      }
+
+      const fileObj = matchedVersion?.files?.find((f: any) => f.primary) || matchedVersion?.files?.[0];
+      if (!fileObj?.url) {
+        throw new BadRequestException('Could not resolve download file for selected version');
+      }
+
       downloadUrl = fileObj.url;
       resolvedFileName = fileObj.filename || `${dto.pluginId}.jar`;
     }
